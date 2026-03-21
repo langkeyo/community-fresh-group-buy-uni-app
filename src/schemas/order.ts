@@ -7,6 +7,7 @@ export const backendOrderItemSchema = z.object({
   qty: z.number(),
   price: z.string(),
   pickPointName: z.string(),
+  pickPointAddress: z.string(),
   status: z.number(),
   createTime: z.string()
 })

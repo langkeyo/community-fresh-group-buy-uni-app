@@ -20,6 +20,7 @@ function mapBackendOrderToOrderInfo(item: BackendOrderItem): OrderInfo {
     qty: item.qty,
     price: item.price,
     pickPointName: item.pickPointName,
+    pickPointAddress: item.pickPointAddress,
     status: normalizeOrderStatus(item.status),
     createTime: item.createTime || ''
   }

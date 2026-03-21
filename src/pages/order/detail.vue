@@ -30,6 +30,11 @@ const currentStatusUI = computed(() => {
     : ORDER_STATUS_FALLBACK
 })
 
+const displayCreateTime = computed(() => {
+  const raw = orderInfo.value?.createTime || ''
+  return raw ? raw.replace('T', ' ') : '-'
+})
+
 async function fetchOrderDetail(id: string) {
   return getOrderDetail(id, userStore.userId)
 }
@@ -121,10 +126,17 @@ function buyAgain() {
     >
       <text class="text-sm text-gray-600">订单号：{{ orderInfo?.no }}</text>
       <text class="text-base font-bold text-fresh">{{ orderInfo?.name }}</text>
+
+      <text class="text-sm text-gray-600"
+        >自提点：{{ orderInfo?.pickPointName || '-' }}</text
+      >
+      <text class="text-sm text-gray-600"
+        >自提点地址：{{ orderInfo?.pickPointAddress || '-' }}</text
+      >
       <text class="text-sm text-gray-600">数量：{{ orderInfo?.qty }}</text>
       <text class="text-sm text-gray-600">实付：￥{{ orderInfo?.price }}</text>
       <text class="text-sm text-gray-600"
-        >自提点：{{ orderInfo?.pickPointName || '-' }}</text
+        >下单时间：{{ displayCreateTime }}</text
       >
       <view
         class="inline-block px-3 py-1 rounded-full"

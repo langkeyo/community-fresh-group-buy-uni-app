@@ -6,7 +6,8 @@ export interface OrderInfo {
   name: string
   qty: number
   price: string
-  status: OrderStatus
   pickPointName: string
+  pickPointAddress: string
+  status: OrderStatus
   createTime: string
 }
