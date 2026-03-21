@@ -19,7 +19,8 @@ function mapBackendOrderToOrderInfo(item: BackendOrderItem): OrderInfo {
     name: item.name,
     qty: item.qty,
     price: item.price,
-    status: normalizeOrderStatus(item.status)
+    status: normalizeOrderStatus(item.status),
+    createTime: item.createTime || ''
   }
 }
 

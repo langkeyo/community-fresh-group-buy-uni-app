@@ -132,6 +132,9 @@ onShow(() => {
           <text>数量：{{ item.qty }}</text>
           <text>￥{{ item.price }}</text>
         </view>
+        <text class="block text-xs text-gray-400 pt-1">
+          下单时间: {{ item.createTime || '-' }}
+        </text>
       </view>
     </view>
 

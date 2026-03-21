@@ -7,4 +7,5 @@ export interface OrderInfo {
   qty: number
   price: string
   status: OrderStatus
+  createTime: string
 }

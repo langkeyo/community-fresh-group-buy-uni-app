@@ -8,6 +8,7 @@ export interface BackendOrderItem {
   qty: number
   price: string
   status: number
+  createTime: string
 }
 
 export const getOrderListApi = (userId: number) => {
