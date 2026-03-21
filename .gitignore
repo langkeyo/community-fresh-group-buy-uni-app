@@ -19,3 +19,8 @@ dist
 *.njsproj
 *.sln
 *.sw?
+
+*.bak
+_assets_backup/
+
+docs/**
