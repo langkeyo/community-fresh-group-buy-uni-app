@@ -29,14 +29,25 @@ module.exports = {
         7: '28rpx',
         8: '32rpx',
         9: '36rpx',
-        10: '40rpx'
+        10: '40rpx',
+        12: '48rpx',
+        14: '56rpx',
+        16: '64rpx',
+        20: '80rpx',
+        24: '96rpx',
+        32: '128rpx',
+        40: '160rpx',
+        48: '192rpx',
+        64: '256rpx'
       },
       fontSize: {
         // 小程序常用字号（rpx）
+        xs: '20rpx',
         sm: '24rpx',
         base: '28rpx',
         lg: '32rpx',
-        xl: '36rpx'
+        xl: '36rpx',
+        '2xl': '40rpx'
       }
     }
   },

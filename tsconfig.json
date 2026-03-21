@@ -3,6 +3,7 @@
   "compilerOptions": {
     "sourceMap": true,
     "moduleResolution": "bundler",
+    "verbatimModuleSyntax": true,
     "paths": {
       "@/*": ["./src/*"]
     },
