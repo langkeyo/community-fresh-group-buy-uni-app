@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { login, getUserInfo } from '@/api/user'
+import { useUserStore } from '@/stores/user'
 
+const userStore = useUserStore()
+
+// TODO: 后续大量用户改 userId:string
 const handleWechatLogin = async () => {
   uni.showLoading({ title: '登录中...' })
 
@@ -20,12 +24,22 @@ const handleWechatLogin = async () => {
 
       // 4. 顺手把用户信息也存了 (如果有的话)，没有就再调一次 info 接口
       if (res.data.userInfo) {
+        const uid = Number(res.data.userInfo.id)
+        if (!Number.isSafeInteger(uid)) {
+          throw new Error('用户ID超出安全范围，请改为字符串ID方案')
+        }
         uni.setStorageSync('userInfo', res.data.userInfo)
+        userStore.setUserId(uid)
       } else {
         // 如果登录接口没返回用户信息，稍微花点时间去拉取一下
         const infoRes = await getUserInfo()
         if (infoRes.data) {
+          const uid = Number(infoRes.data.id)
+          if (!Number.isSafeInteger(infoRes.data.id)) {
+            throw new Error('用户ID超出安全范围，请改为字符串ID方案')
+          }
           uni.setStorageSync('userInfo', infoRes.data)
+          userStore.setUserId(uid)
         }
       }
 
@@ -48,7 +62,7 @@ const handleWechatLogin = async () => {
 <template>
   <view class="flex flex-col items-center justify-center h-screen bg-white">
     <!-- Logo 区域 -->
-    <view class="mb-12 text-center flex flex-col items-center">
+    <view class="flex flex-col items-center mb-12 text-center">
       <view
         class="w-24 h-24 bg-[#F08800] rounded-2xl flex items-center justify-center mb-4 shadow-lg rotate-3"
       >
@@ -57,7 +71,7 @@ const handleWechatLogin = async () => {
       <text class="text-2xl font-bold text-[#2F5233] tracking-wider"
         >邻里鲜拼</text
       >
-      <text class="text-sm text-gray-400 mt-2">社区生鲜 · 每日必达</text>
+      <text class="mt-2 text-sm text-gray-400">社区生鲜 · 每日必达</text>
     </view>
 
     <!-- 登录按钮 -->

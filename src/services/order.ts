@@ -3,6 +3,7 @@ import {
   getOrderListApi,
   type BackendOrderItem
 } from '@/api/order'
+import { backendOrderItemSchema, backendOrderListSchema } from '@/schemas/order'
 import type { OrderInfo } from '@/types/order'
 
 function normalizeOrderStatus(status: number): OrderInfo['status'] {
@@ -13,7 +14,7 @@ function normalizeOrderStatus(status: number): OrderInfo['status'] {
 
 function mapBackendOrderToOrderInfo(item: BackendOrderItem): OrderInfo {
   return {
-    id: Number(item.id),
+    id: item.id,
     no: item.no,
     name: item.name,
     qty: item.qty,
@@ -25,14 +26,32 @@ function mapBackendOrderToOrderInfo(item: BackendOrderItem): OrderInfo {
 export async function getOrderList(userId: number): Promise<OrderInfo[]> {
   const res = await getOrderListApi(userId)
   const list = res.data ?? []
-  return list.map(mapBackendOrderToOrderInfo)
+
+  const parsed = backendOrderListSchema.safeParse(list)
+  if (!parsed?.success) {
+    const issue = parsed.error.issues[0]
+    throw new Error(
+      `订单列表数据格式异常: ${issue?.path?.join('.') || 'unknown'}`
+    )
+  }
+
+  return parsed.data.map(mapBackendOrderToOrderInfo)
 }
 
 export async function getOrderDetail(
-  id: number,
+  id: string,
   _userId: number
 ): Promise<OrderInfo | undefined> {
   const res = await getOrderDetailApi(id)
   if (!res.data) return undefined
-  return mapBackendOrderToOrderInfo(res.data)
+
+  const parsed = backendOrderItemSchema.safeParse(res.data)
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0]
+    throw new Error(
+      `订单详情数据格式异常: ${issue?.path?.join('.') || 'unknown'}`
+    )
+  }
+
+  return mapBackendOrderToOrderInfo(parsed.data)
 }

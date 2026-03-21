@@ -1,23 +1,24 @@
 <script setup lang="ts">
-import { CURRENT_USER_ID } from '@/constants/current-user'
 import {
   ORDER_STATUS_FALLBACK,
   ORDER_STATUS_MAP
 } from '@/constants/order-status'
 import { getOrderDetail } from '@/services/order'
+import { useUserStore } from '@/stores/user'
 import type { OrderInfo } from '@/types/order'
 import { onLoad } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 
+const userStore = useUserStore()
 const orderInfo = ref<OrderInfo | null>(null)
 const found = ref(false)
 const loading = ref(true)
 const errorMsg = ref('')
 const isNavigating = ref(false)
-const currentOrderId = ref(0)
+const currentOrderId = ref('')
 
 onLoad((query) => {
-  const id = Number(query?.id || 0)
+  const id = String(query?.id || '')
   currentOrderId.value = id
   loadOrderDetail(id)
 })
@@ -29,11 +30,11 @@ const currentStatusUI = computed(() => {
     : ORDER_STATUS_FALLBACK
 })
 
-async function fetchOrderDetail(id: number) {
-  return getOrderDetail(id, CURRENT_USER_ID)
+async function fetchOrderDetail(id: string) {
+  return getOrderDetail(id, userStore.userId)
 }
 
-async function loadOrderDetail(id: number) {
+async function loadOrderDetail(id: string) {
   loading.value = true
   errorMsg.value = ''
   found.value = false
@@ -44,8 +45,11 @@ async function loadOrderDetail(id: number) {
     if (!target) return
     orderInfo.value = target
     found.value = true
-  } catch (error) {
-    if (String((error as Error)?.message || '').includes('订单不存在')) {
+  } catch (error: any) {
+    const code = Number(error?.code)
+    const message = String(error?.message || '')
+
+    if (code === 3001 || message.includes('订单不存在')) {
       found.value = false
       return
     }

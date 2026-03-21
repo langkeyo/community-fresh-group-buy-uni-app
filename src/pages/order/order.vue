@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { CURRENT_USER_ID } from '@/constants/current-user'
 import {
   ORDER_STATUS_FALLBACK,
   ORDER_STATUS_MAP
 } from '@/constants/order-status'
 import { getOrderList } from '@/services/order'
+import { useUserStore } from '@/stores/user'
 import type { OrderInfo } from '@/types/order'
 import { onShow } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
@@ -16,6 +16,7 @@ const statusList = [
   { label: '已取货', value: 3 }
 ]
 
+const userStore = useUserStore()
 const activeStatus = ref<'all' | number>('all')
 const orderList = ref<OrderInfo[]>([])
 const loading = ref(true)
@@ -39,7 +40,7 @@ const displayOrders = computed(() => {
   }))
 })
 
-function goToOrderDetail(id: number) {
+function goToOrderDetail(id: string) {
   uni.navigateTo({ url: `/pages/order/detail?id=${id}` })
 }
 
@@ -52,9 +53,10 @@ async function loadOrderList() {
   errorMsg.value = ''
 
   try {
-    orderList.value = await getOrderList(CURRENT_USER_ID)
+    orderList.value = await getOrderList(userStore.userId)
     hasLoaded.value = true
   } catch (error) {
+    console.log(error)
     errorMsg.value = '订单加载失败，请稍后重试'
   } finally {
     loading.value = false

@@ -1,7 +1,7 @@
 import type { OrderStatus } from '@/constants/order-status'
 
 export interface OrderInfo {
-  id: number
+  id: string
   no: string
   name: string
   qty: number
