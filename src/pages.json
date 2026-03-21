@@ -71,6 +71,15 @@
         "navigationBarTextStyle": "white"
       }
     },
+    // 订单详情
+    {
+      "path": "pages/order/detail",
+      "style": {
+        "navigationBarTitleText": "订单详情",
+        "navigationBarBackgroundColor": "#F08800",
+        "navigationBarTextStyle": "white"
+      }
+    },
     // 自提点页
     {
       "path": "pages/self-pick/self-pick",

@@ -122,7 +122,7 @@ const handleSetting = () => {
       <view class="flex items-center" @click="handleLogin">
         <!-- 头像：已登录显示头像，未登录显示默认 -->
         <image
-          :src="userInfo?.avatar || '/static/logo.png'"
+          :src="userInfo?.avatar || '/static/logo.webp'"
           mode="aspectFill"
           class="w-16 h-16 rounded-full border-2 border-white bg-white mr-4"
         />
