@@ -123,6 +123,9 @@ function buyAgain() {
       <text class="text-base font-bold text-fresh">{{ orderInfo?.name }}</text>
       <text class="text-sm text-gray-600">数量：{{ orderInfo?.qty }}</text>
       <text class="text-sm text-gray-600">实付：￥{{ orderInfo?.price }}</text>
+      <text class="text-sm text-gray-600"
+        >自提点：{{ orderInfo?.pickPointName || '-' }}</text
+      >
       <view
         class="inline-block px-3 py-1 rounded-full"
         :class="currentStatusUI.bgClass"

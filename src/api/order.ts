@@ -7,6 +7,7 @@ export interface BackendOrderItem {
   name: string
   qty: number
   price: string
+  pickPointName: string
   status: number
   createTime: string
 }
