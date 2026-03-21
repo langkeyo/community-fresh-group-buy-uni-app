@@ -1,6 +1,7 @@
 import {
   getOrderDetailApi,
   getOrderListApi,
+  updateStatusApi,
   type BackendOrderItem
 } from '@/api/order'
 import { backendOrderItemSchema, backendOrderListSchema } from '@/schemas/order'
@@ -57,4 +58,12 @@ export async function getOrderDetail(
   }
 
   return mapBackendOrderToOrderInfo(parsed.data)
+}
+
+export async function updateStatus(
+  orderId: string | number,
+  status: number
+): Promise<string> {
+  const res = await updateStatusApi(orderId, status)
+  return res.data
 }

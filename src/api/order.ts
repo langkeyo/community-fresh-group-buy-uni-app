@@ -24,3 +24,9 @@ export const getOrderDetailApi = (orderId: number | string) => {
     `/api/order/${orderId}`
   ) as unknown as Promise<Result<BackendOrderItem>>
 }
+
+export const updateStatusApi = (orderId: number | string, status: number) => {
+  return http.put<Result<string>>(
+    `/api/order/updateStatus/${orderId}?status=${status}`
+  ) as unknown as Promise<Result<string>>
+}

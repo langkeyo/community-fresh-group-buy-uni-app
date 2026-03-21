@@ -3,7 +3,7 @@ import {
   ORDER_STATUS_FALLBACK,
   ORDER_STATUS_MAP
 } from '@/constants/order-status'
-import { getOrderDetail } from '@/services/order'
+import { getOrderDetail, updateStatus } from '@/services/order'
 import { useUserStore } from '@/stores/user'
 import type { OrderInfo } from '@/types/order'
 import { onLoad } from '@dcloudio/uni-app'
@@ -34,6 +34,36 @@ const displayCreateTime = computed(() => {
   const raw = orderInfo.value?.createTime || ''
   return raw ? raw.replace('T', ' ') : '-'
 })
+
+const nextStatus = computed<number | null>(() => {
+  const s = orderInfo.value?.status
+  if (s === 1) return 2
+  if (s === 2) return 3
+  return null
+})
+
+const nextStatusText = computed(() => {
+  if (nextStatus.value === 2) return '标记为已成团'
+  if (nextStatus.value === 3) return '标记为已取货'
+  return ''
+})
+
+async function handleUpdateStatus() {
+  if (!orderInfo.value || !nextStatus.value) return
+  try {
+    await updateStatus(orderInfo.value.id, nextStatus.value)
+    uni.setStorageSync('order_need_refresh', true)
+    await loadOrderDetail(orderInfo.value.id)
+    uni.showToast({ title: '状态更新成功', icon: 'success' })
+  } catch (error: any) {
+    const code = Number(error?.code)
+    if (code === 3002) {
+      uni.showToast({ title: '状态流转不合法', icon: 'none' })
+      return
+    }
+    uni.showToast({ title: '状态更新失败', icon: 'none' })
+  }
+}
 
 async function fetchOrderDetail(id: string) {
   return getOrderDetail(id, userStore.userId)
@@ -145,6 +175,14 @@ function buyAgain() {
         <text class="text-sm" :class="currentStatusUI.textClass">
           状态：{{ currentStatusUI.label }}
         </text>
+      </view>
+
+      <view
+        v-if="nextStatus"
+        class="w-full py-3 text-base text-center text-white rounded-full bg-primary"
+        @click="handleUpdateStatus"
+      >
+        {{ nextStatusText }}
       </view>
 
       <view class="flex gap-3 text-center">
