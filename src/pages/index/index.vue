@@ -70,6 +70,10 @@ const leaderList = [
 function goToProductPage() {
   uni.switchTab({ url: '/pages/goods/goods' })
 }
+
+function goToAiFoodPage() {
+  uni.navigateTo({ url: '/pages/ai-food/ai-food' })
+}
 </script>
 
 <template>
@@ -124,7 +128,7 @@ function goToProductPage() {
     <!-- AI 模块 -->
     <view
       class="bg-gradient-to-r from-secondary to-white rounded-lg p-4 flex items-center justify-between shadow-sm"
-      @click="goToProductPage"
+      @click="goToAiFoodPage"
     >
       <view>
         <text class="block text-sm font-bold text-fresh">AI 食材搭配助手</text>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getAiRecipeRecommend } from '@/services/ai'
 import { ref } from 'vue'
 
 // --- 类型定义 ---
@@ -10,68 +11,20 @@ interface RecipeStep {
 interface RecipeCard {
   id: number
   title: string
-  tags: string[] // 如 ['低脂', '15分钟']
+  tags: string[]
   image: string
   desc: string
   steps: RecipeStep[]
   isCollected: boolean
-  timestamp: string // 模拟生成时间
+  timestamp: string
+  source: 'DB' | 'AI'
+  disclaimer: string
 }
 
 // --- 响应式数据 ---
 const inputValue = ref('')
 const isThinking = ref(false) // AI 是否正在思考
 const chatHistory = ref<RecipeCard[]>([]) // 生成的食谱历史
-
-// 预设的 Mock 数据库 (用于模拟 AI 返回)
-const mockDatabase = {
-  chicken: {
-    title: '香煎迷迭香鸡胸肉',
-    desc: '减脂期的完美选择，外焦里嫩，汁水丰盈。',
-    tags: ['减脂', '高蛋白', '20分钟'],
-    image: 'https://loremflickr.com/500/300/chicken,steak?lock=101',
-    steps: [
-      { step: 1, content: '鸡胸肉洗净擦干，表面划十字刀。' },
-      { step: 2, content: '用海盐、黑胡椒、橄榄油腌制15分钟。' },
-      { step: 3, content: '小火慢煎至两面金黄，撒上迷迭香即可。' }
-    ]
-  },
-  egg: {
-    title: '滑嫩虾仁跑蛋',
-    desc: '经典的家常美味，蛋香浓郁，虾仁Q弹。',
-    tags: ['家常菜', '快手', '老少皆宜'],
-    image: 'https://loremflickr.com/500/300/egg,shrimp?lock=102',
-    steps: [
-      { step: 1, content: '鸡蛋打散加入少许牛奶，虾仁焯水变色。' },
-      { step: 2, content: '热锅凉油，倒入蛋液快速滑炒。' },
-      { step: 3, content: '加入虾仁混合，撒葱花出锅。' }
-    ]
-  },
-  diet: {
-    title: '超级牛油果大碗沙拉',
-    desc: '清爽解腻，富含优质脂肪和膳食纤维。',
-    tags: ['素食', '排毒', '无需开火'],
-    image: 'https://loremflickr.com/500/300/salad,avocado?lock=103',
-    steps: [
-      { step: 1, content: '生菜、苦菊洗净铺底。' },
-      { step: 2, content: '牛油果切片，小番茄对半切开。' },
-      { step: 3, content: '淋上油醋汁，撒上坚果碎拌匀。' }
-    ]
-  },
-  default: {
-    title: '时令鲜蔬什锦小炒',
-    desc: '不知道吃什么？把冰箱里的蔬菜都炒了吧！',
-    tags: ['清淡', '维生素', '百搭'],
-    image: 'https://loremflickr.com/500/300/vegetables,fry?lock=104',
-    steps: [
-      { step: 1, content: '所有蔬菜洗净切段/切片。' },
-      { step: 2, content: '蒜末爆香，先炒硬菜(如胡萝卜)，后炒叶菜。' },
-      { step: 3, content: '加入耗油调味，大火快炒出锅。' }
-    ]
-  }
-}
-
-// --- 核心逻辑 ---
 
 // 发送请求
 const handleSend = () => {
@@ -85,48 +38,29 @@ const handleSend = () => {
   scrollToBottom()
 
   // 模拟 AI 思考延迟
-  setTimeout(() => {
-    generateResponse(query)
-    isThinking.value = false
-    scrollToBottom()
+  setTimeout(async () => {
+    try {
+      await generateResponse(query)
+      scrollToBottom()
+    } catch (error) {
+      uni.showToast({ title: '推荐失败，请稍后重试', icon: 'none' })
+    } finally {
+      isThinking.value = false
+    }
   }, 1500)
 }
 
 // 生成回复逻辑
-const generateResponse = (query: string) => {
-  let resultTemplate
-
-  // 简单的关键词匹配模拟
-  if (query.includes('鸡') || query.includes('肉')) {
-    resultTemplate = mockDatabase.chicken
-  } else if (query.includes('蛋') || query.includes('虾')) {
-    resultTemplate = mockDatabase.egg
-  } else if (
-    query.includes('减肥') ||
-    query.includes('瘦') ||
-    query.includes('脂')
-  ) {
-    resultTemplate = mockDatabase.diet
-  } else {
-    resultTemplate = mockDatabase.default
-  }
-
-  // 构造新卡片
-  const newCard: RecipeCard = {
-    id: Date.now(),
-    title: resultTemplate.title,
-    desc: resultTemplate.desc,
-    tags: resultTemplate.tags,
-    image: resultTemplate.image, // 实际开发中这里可以随机lock值
-    steps: resultTemplate.steps,
+const generateResponse = async (query: string) => {
+  const result = await getAiRecipeRecommend(query)
+  chatHistory.value.push({
+    ...result,
     isCollected: false,
     timestamp: new Date().toLocaleTimeString('zh-CN', {
       hour: '2-digit',
       minute: '2-digit'
     })
-  }
-
-  chatHistory.value.push(newCard)
+  })
 }
 
 // 收藏/取消收藏
@@ -223,10 +157,22 @@ const handleTagClick = (text: string) => {
 
           <view class="p-4">
             <view class="flex justify-between items-start mb-2">
-              <text class="text-lg font-bold text-[#2F5233] flex-1 mr-2">{{
-                card.title
-              }}</text>
-              <view @click="toggleCollect(card)">
+              <view class="flex-1 mr-2 space-y-1">
+                <text class="text-lg font-bold text-[#2F5233]">{{
+                  card.title
+                }}</text>
+                <text
+                  class="inline-block text-[20rpx] px-2 py-0.5 rounded"
+                  :class="
+                    card.source === 'DB'
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-orange-100 text-orange-700'
+                  "
+                >
+                  {{ card.source === 'DB' ? '词典命中' : 'AI生成' }}
+                </text>
+              </view>
+              <view class="mt-0.5" @click="toggleCollect(card)">
                 <text
                   class="text-xl"
                   :class="card.isCollected ? 'text-[#F08800]' : 'text-gray-300'"
@@ -249,6 +195,12 @@ const handleTagClick = (text: string) => {
 
             <text class="text-sm text-gray-600 mb-4 block leading-relaxed">
               {{ card.desc }}
+            </text>
+            <text
+              v-if="card.disclaimer"
+              class="text-[22rpx] text-orange-500 mb-3 block"
+            >
+              {{ card.disclaimer }}
             </text>
 
             <!-- 步骤 -->
