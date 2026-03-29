@@ -13,6 +13,21 @@ export interface BackendOrderItem {
   createTime: string
 }
 
+export interface CreateOrderReq {
+  userId: number
+  productId: number
+  totalPrice: number
+  pickPointId: number
+  groupBuyId?: string | null
+}
+
+export const createOrderApi = (data: CreateOrderReq) => {
+  return http.post<Result<string>>(
+    '/api/order/create',
+    data
+  ) as unknown as Promise<Result<string>>
+}
+
 export const getOrderListApi = (userId: number) => {
   return http.get<Result<BackendOrderItem[]>>(
     `/api/order/list/${userId}`

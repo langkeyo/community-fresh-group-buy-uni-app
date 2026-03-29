@@ -63,7 +63,10 @@ const filteredGoods = computed(() => {
 })
 
 function goToGroupBuy(id) {
-  uni.navigateTo({ url: `/pages/group-buy/group-buy?id=${id}` })
+  const pickPointId = 1 // 先最小可用，后续接真实自提点选择
+  uni.navigateTo({
+    url: `/pages/group-buy/group-buy?id=${id}&pickPointId=${pickPointId}`
+  })
 }
 
 onMounted(() => {

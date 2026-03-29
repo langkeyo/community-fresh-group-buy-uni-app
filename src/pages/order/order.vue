@@ -29,6 +29,15 @@ const filteredOrders = computed(() => {
   return orderList.value.filter((o) => o.status === activeStatus.value)
 })
 
+const statusCountMap = computed(() => {
+  const map: Record<string, number> = { all: orderList.value.length }
+  for (const item of orderList.value) {
+    const key = String(item.status)
+    map[key] = (map[key] || 0) + 1
+  }
+  return map
+})
+
 const displayOrders = computed(() => {
   return filteredOrders.value.map((item) => ({
     ...item,
@@ -54,6 +63,7 @@ async function loadOrderList() {
 
   try {
     orderList.value = await getOrderList(userStore.userId)
+    console.log(orderList.value)
     hasLoaded.value = true
   } catch (error) {
     console.log(error)
@@ -93,7 +103,7 @@ onShow(() => {
         "
         @click="activeStatus = item.value"
       >
-        {{ item.label }}
+        {{ item.label }}({{ statusCountMap[String(item.value)] || 0 }})
       </view>
     </view>
 

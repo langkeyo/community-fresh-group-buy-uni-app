@@ -1,6 +1,10 @@
 <script setup lang="ts">
+import { createOrder } from '@/services/order'
+import { useUserStore } from '@/stores/user'
+import { onLoad } from '@dcloudio/uni-app'
 import { ref } from 'vue'
 
+const userStore = useUserStore()
 const ORDER_REFRESH_FLAG = 'order_need_refresh'
 const isSubmitting = ref(false)
 const currentAction = ref<'start' | 'join' | ''>('')
@@ -10,6 +14,8 @@ const formData = ref({
   mobile: '',
   pickupPoint: ''
 })
+const productId = ref<number | null>(null)
+const pickPointId = ref<number | null>(null)
 
 function validateForm() {
   if (!formData.value.receiverName.trim()) {
@@ -38,29 +44,29 @@ function validateForm() {
     return false
   }
 
-  if (!formData.value.pickupPoint.trim()) {
-    uni.showToast({
-      title: '请选择自提点',
-      icon: 'none'
-    })
-    return false
-  }
-
   return true
 }
 
 async function submitGroupBuy(
   action: 'start' | 'join',
-  data: typeof formData.value
+  productId: number,
+  pickPointId: number
 ) {
-  await new Promise((resolve) => setTimeout(resolve, 500))
-
-  if (action === 'start') {
-    console.log('发起拼团数据：', data)
-    return
+  // TODO: 先用页面静态数据，后续改成真实商品详情来源
+  const payload = {
+    userId: userStore.userId,
+    productId: productId,
+    totalPrice: 9.9,
+    pickPointId: pickPointId,
+    groupBuyId: action === 'join' ? 'TEMP_GROUP_001' : null
   }
 
-  console.log('加入拼团数据：', data)
+  await createOrder(payload)
+
+  uni.showToast({
+    title: action === 'start' ? '发起拼团成功' : '加入拼团成功',
+    icon: 'success'
+  })
 }
 
 function resetForm() {
@@ -76,27 +82,54 @@ async function handleSubmitGroupBuy(action: 'start' | 'join') {
   if (isSubmitting.value) return
   if (!validateForm()) return
 
+  if (productId.value === null) {
+    uni.showToast({ title: '商品信息缺失，请返回重试', icon: 'none' })
+    return
+  }
+
+  if (pickPointId.value === null) {
+    uni.showToast({ title: '自提点信息确实，请返回重试', icon: 'none' })
+    return
+  }
+
+  const safeProductId = productId.value // 这里的类型是 number
+  const safePickPointId = pickPointId.value
+
   currentAction.value = action
   isSubmitting.value = true
 
   try {
-    await submitGroupBuy(action, formData.value)
+    await submitGroupBuy(action, safeProductId, safePickPointId)
 
     resetForm()
     uni.setStorageSync(ORDER_REFRESH_FLAG, true)
     uni.switchTab({
       url: '/pages/order/order'
     })
-  } catch (error) {
-    uni.showToast({
-      title: '拼团提交失败',
-      icon: 'none'
-    })
+  } catch (error: any) {
+    const code = Number(error?.code)
+    if (code === 3003) {
+      uni.showToast({ title: '订单创建失败', icon: 'none' })
+    } else {
+      uni.showToast({ title: '拼团提交失败', icon: 'none' })
+    }
   } finally {
     isSubmitting.value = false
     currentAction.value = ''
   }
 }
+
+onLoad((query) => {
+  const id = Number(query?.id)
+  productId.value = Number.isFinite(id) && id > 0 ? id : null
+
+  const pp = Number(query?.pickPointId)
+  pickPointId.value = Number.isFinite(pp) && pp > 0 ? pp : null
+
+  if (pickPointId.value) {
+    formData.value.pickupPoint = `自提点#${pickPointId.value}`
+  }
+})
 </script>
 
 <template>
@@ -190,12 +223,9 @@ async function handleSubmitGroupBuy(action: 'start' | 'join') {
 
       <!-- 自提点 -->
       <view class="px-3 py-2 border border-gray-200 rounded-md bg-gray-50">
-        <input
-          v-model="formData.pickupPoint"
-          type="text"
-          placeholder="选择自提点"
-          class="text-base"
-        />
+        <text class="text-base text-gray-700">
+          {{ formData.pickupPoint || '默认自提点（后续接真实选择）' }}
+        </text>
       </view>
     </view>
 

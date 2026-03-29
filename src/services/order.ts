@@ -1,8 +1,10 @@
 import {
+  createOrderApi,
   getOrderDetailApi,
   getOrderListApi,
   updateStatusApi,
-  type BackendOrderItem
+  type BackendOrderItem,
+  type CreateOrderReq
 } from '@/api/order'
 import { backendOrderItemSchema, backendOrderListSchema } from '@/schemas/order'
 import type { OrderInfo } from '@/types/order'
@@ -58,6 +60,11 @@ export async function getOrderDetail(
   }
 
   return mapBackendOrderToOrderInfo(parsed.data)
+}
+
+export async function createOrder(payload: CreateOrderReq): Promise<string> {
+  const res = await createOrderApi(payload)
+  return res.data || ''
 }
 
 export async function updateStatus(

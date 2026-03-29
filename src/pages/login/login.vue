@@ -35,7 +35,7 @@ const handleWechatLogin = async () => {
         const infoRes = await getUserInfo()
         if (infoRes.data) {
           const uid = Number(infoRes.data.id)
-          if (!Number.isSafeInteger(infoRes.data.id)) {
+          if (!Number.isSafeInteger(uid)) {
             throw new Error('用户ID超出安全范围，请改为字符串ID方案')
           }
           uni.setStorageSync('userInfo', infoRes.data)
