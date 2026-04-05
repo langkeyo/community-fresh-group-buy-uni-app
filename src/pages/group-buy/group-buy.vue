@@ -57,11 +57,11 @@ async function submitGroupBuy(
   productId: number,
   pickPointId: number
 ) {
-  // TODO: 先用页面静态数据，后续改成真实商品详情来源
+  // 价格为占位展示，不参与业务计算（后端暂无真实价格字段）
   const payload = {
     userId: userStore.userId,
     productId: productId,
-    totalPrice: 9.9,
+    totalPrice: 0,
     pickPointId: pickPointId,
     groupBuyId: action === 'join' ? 'TEMP_GROUP_001' : null
   }
@@ -93,7 +93,7 @@ async function handleSubmitGroupBuy(action: 'start' | 'join') {
   }
 
   if (pickPointId.value === null) {
-    uni.showToast({ title: '自提点信息确实，请返回重试', icon: 'none' })
+    uni.showToast({ title: '自提点信息缺失，请返回重试', icon: 'none' })
     return
   }
 
@@ -167,8 +167,7 @@ onLoad(async (query) => {
       <text class="text-base font-bold text-fresh">{{ productName }}</text>
       <view class="flex items-center gap-2">
         <text class="text-xs text-primary">￥</text>
-        <text class="text-lg font-bold text-primary">4.99</text>
-        <text class="text-xs text-gray-400 line-through">￥8.00</text>
+        <text class="text-sm text-gray-400">--</text>
       </view>
     </view>
 

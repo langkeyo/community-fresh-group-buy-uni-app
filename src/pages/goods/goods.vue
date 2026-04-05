@@ -36,6 +36,7 @@ const filteredGoods = computed(() => {
 })
 
 const viewGoods = computed(() => {
+  // price/sales 为占位展示，不参与筛选或业务计算
   return filteredGoods.value.map((item) => ({
     ...item,
     price: '--',
@@ -44,8 +45,13 @@ const viewGoods = computed(() => {
   }))
 })
 
-function goToGroupBuy(id) {
-  const pickPointId = Number(uni.getStorageSync('default_pick_point_id')) || 1
+function goToGroupBuy(id: string | number) {
+  const pickPointId = Number(uni.getStorageSync('default_pick_point_id'))
+  if (!pickPointId) {
+    uni.showToast({ title: '请先选择自提点', icon: 'none' })
+    uni.navigateTo({ url: '/pages/self-pick/self-pick' })
+    return
+  }
   uni.navigateTo({
     url: `/pages/group-buy/group-buy?id=${id}&pickPointId=${pickPointId}`
   })
@@ -112,14 +118,10 @@ onMounted(() => {
             <text class="block text-xs text-gray-500 mt-1"
               >商品编号：{{ item.id }}</text
             >
-            <view class="mt-2 flex items-center gap-2">
-              <text class="text-xs text-primary">￥</text>
-              <text class="text-base font-bold text-primary">{{
-                item.price
-              }}</text>
-              <text
-                v-if="item.originalPrice"
-                class="text-xs text-gray-400 line-through"
+            <view class="mt-2 flex items-center gap-2 text-gray-400">
+              <text class="text-xs">￥</text>
+              <text class="text-sm">{{ item.price }}</text>
+              <text v-if="item.originalPrice" class="text-xs line-through"
                 >￥{{ item.originalPrice }}</text
               >
             </view>
