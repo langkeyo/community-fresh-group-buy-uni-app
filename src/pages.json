@@ -19,6 +19,14 @@
         "navigationBarTextStyle": "white"
       }
     },
+    {
+      "path": "pages/goods/detail",
+      "style": {
+        "navigationBarTitleText": "商品详情",
+        "navigationBarBackgroundColor": "#F08800",
+        "navigationBarTextStyle": "white"
+      }
+    },
     // 拼团页
     {
       "path": "pages/group-buy/group-buy",

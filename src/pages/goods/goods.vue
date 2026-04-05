@@ -63,6 +63,10 @@ const viewGoods = computed(() => {
   }))
 })
 
+function goToDetail(id: string | number) {
+  uni.navigateTo({ url: `/pages/goods/detail?id=${id}` })
+}
+
 function goToGroupBuy(id: string | number) {
   const pickPointId = Number(uni.getStorageSync('default_pick_point_id'))
   if (!pickPointId) {
@@ -130,7 +134,7 @@ onMounted(() => {
       <BaseCard
         v-for="item in viewGoods"
         :key="item.id"
-        @click="goToGroupBuy(item.id)"
+        @click="goToDetail(item.id)"
       >
         <view class="flex gap-3">
           <image
@@ -156,6 +160,9 @@ onMounted(() => {
                 >￥{{ item.originPriceDisplay }}</text
               >
               <text class="text-xs text-gray-400">库存 {{ item.stock }}</text>
+            </view>
+            <view class="mt-3">
+              <BaseButton type="default" text="去拼团" @click.stop="goToGroupBuy(item.id)" />
             </view>
           </view>
         </view>
