@@ -22,15 +22,20 @@ export async function getAiRecipeRecommend(
   const res = await recommendAiApi(query)
   const data = res.data
   if (!data?.recipe) {
-    throw new Error('AI推荐结果为空')
+    throw new Error('EMPTY_RESULT')
+  }
+  const hasTitle = Boolean(data.recipe.title)
+  const hasSteps = Array.isArray(data.recipe.steps) && data.recipe.steps.length > 0
+  if (!hasTitle && !hasSteps) {
+    throw new Error('EMPTY_RESULT')
   }
 
   return {
     id: Date.now(),
-    title: data.recipe.title,
-    desc: data.recipe.desc,
+    title: data.recipe.title || '未命名菜谱',
+    desc: data.recipe.desc || '暂无描述',
     tags: data.recipe.tags || [],
-    image: data.recipe.image,
+    image: data.recipe.image || '',
     steps: data.recipe.steps || [],
     source: data.source,
     disclaimer: data.disclaimer || ''

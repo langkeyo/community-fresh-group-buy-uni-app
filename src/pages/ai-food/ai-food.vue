@@ -21,10 +21,49 @@ interface RecipeCard {
   disclaimer: string
 }
 
+interface FavoriteItem {
+  title: string
+  desc: string
+  tags: string[]
+  image: string
+  steps: RecipeStep[]
+  source: 'DB' | 'AI'
+  disclaimer: string
+}
+
 // --- 响应式数据 ---
 const inputValue = ref('')
 const isThinking = ref(false) // AI 是否正在思考
 const chatHistory = ref<RecipeCard[]>([]) // 生成的食谱历史
+const errorTip = ref('')
+const lastQuery = ref('')
+const FAVORITE_KEY = 'ai_favorites'
+const favoriteMap = ref<Record<string, FavoriteItem>>({})
+
+const getFavoriteKey = (item: FavoriteItem) => `${item.title}||${item.desc}`
+
+const loadFavorites = () => {
+  const stored = uni.getStorageSync(FAVORITE_KEY)
+  if (!stored) {
+    favoriteMap.value = {}
+    return
+  }
+  try {
+    const list = JSON.parse(stored) as FavoriteItem[]
+    const map: Record<string, FavoriteItem> = {}
+    list.forEach((item) => {
+      map[getFavoriteKey(item)] = item
+    })
+    favoriteMap.value = map
+  } catch (error) {
+    favoriteMap.value = {}
+  }
+}
+
+const saveFavorites = () => {
+  const list = Object.values(favoriteMap.value)
+  uni.setStorageSync(FAVORITE_KEY, JSON.stringify(list))
+}
 
 // 发送请求
 const handleSend = () => {
@@ -33,6 +72,8 @@ const handleSend = () => {
   const query = inputValue.value.trim()
   inputValue.value = '' // 清空输入框
   isThinking.value = true
+  errorTip.value = ''
+  lastQuery.value = query
 
   // 滚动到底部
   scrollToBottom()
@@ -43,7 +84,9 @@ const handleSend = () => {
       await generateResponse(query)
       scrollToBottom()
     } catch (error) {
-      uni.showToast({ title: '推荐失败，请稍后重试', icon: 'none' })
+      const msg = resolveErrorMessage(error)
+      errorTip.value = msg
+      uni.showToast({ title: msg, icon: 'none' })
     } finally {
       isThinking.value = false
     }
@@ -53,9 +96,10 @@ const handleSend = () => {
 // 生成回复逻辑
 const generateResponse = async (query: string) => {
   const result = await getAiRecipeRecommend(query)
+  const favKey = getFavoriteKey(result)
   chatHistory.value.push({
     ...result,
-    isCollected: false,
+    isCollected: Boolean(favoriteMap.value[favKey]),
     timestamp: new Date().toLocaleTimeString('zh-CN', {
       hour: '2-digit',
       minute: '2-digit'
@@ -66,6 +110,21 @@ const generateResponse = async (query: string) => {
 // 收藏/取消收藏
 const toggleCollect = (card: RecipeCard) => {
   card.isCollected = !card.isCollected
+  const favKey = getFavoriteKey(card)
+  if (card.isCollected) {
+    favoriteMap.value[favKey] = {
+      title: card.title,
+      desc: card.desc,
+      tags: card.tags,
+      image: card.image,
+      steps: card.steps,
+      source: card.source,
+      disclaimer: card.disclaimer
+    }
+  } else {
+    delete favoriteMap.value[favKey]
+  }
+  saveFavorites()
   const msg = card.isCollected ? '已收藏到我的食谱' : '已取消收藏'
   uni.showToast({ title: msg, icon: 'none' })
 }
@@ -85,6 +144,25 @@ const handleTagClick = (text: string) => {
   inputValue.value = text
   handleSend()
 }
+
+const resolveErrorMessage = (error: any) => {
+  const raw = error?.message || ''
+  if (raw === 'EMPTY_RESULT') {
+    return '暂无可用结果，换个说法试试'
+  }
+  if (raw.includes('timeout') || raw.includes('超时')) {
+    return 'AI响应超时，请稍后重试'
+  }
+  return '推荐失败，请稍后重试'
+}
+
+const retryLast = () => {
+  if (!lastQuery.value || isThinking.value) return
+  inputValue.value = lastQuery.value
+  handleSend()
+}
+
+loadFavorites()
 </script>
 
 <template>
@@ -128,6 +206,21 @@ const handleTagClick = (text: string) => {
           🍗 鸡胸肉怎么做不柴？
         </view>
       </view>
+
+      <view
+        v-if="errorTip"
+        class="mt-6 w-full bg-white rounded-xl p-4 border border-red-100"
+      >
+        <text class="text-sm text-red-500">{{ errorTip }}</text>
+        <view class="mt-3">
+          <view
+            class="inline-flex items-center px-4 py-2 bg-[#F08800] text-white text-sm rounded-full"
+            @click="retryLast"
+          >
+            重试
+          </view>
+        </view>
+      </view>
     </view>
 
     <!-- 2. 对话列表 -->
@@ -162,11 +255,11 @@ const handleTagClick = (text: string) => {
                   card.title
                 }}</text>
                 <text
-                  class="inline-block text-[20rpx] px-2 py-0.5 rounded"
+                  class="inline-flex items-center text-[20rpx] px-2 py-0.5 rounded-full border"
                   :class="
                     card.source === 'DB'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-orange-100 text-orange-700'
+                      ? 'bg-green-50 text-green-700 border-green-200'
+                      : 'bg-orange-50 text-orange-700 border-orange-200'
                   "
                 >
                   {{ card.source === 'DB' ? '词典命中' : 'AI生成' }}
@@ -229,6 +322,18 @@ const handleTagClick = (text: string) => {
                 >
               </view>
             </view>
+          </view>
+        </view>
+      </view>
+
+      <view v-if="errorTip" class="bg-white rounded-xl p-4 border border-red-100">
+        <text class="text-sm text-red-500">{{ errorTip }}</text>
+        <view class="mt-3">
+          <view
+            class="inline-flex items-center px-4 py-2 bg-[#F08800] text-white text-sm rounded-full"
+            @click="retryLast"
+          >
+            重试
           </view>
         </view>
       </view>
