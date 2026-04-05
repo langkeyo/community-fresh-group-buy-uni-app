@@ -1,4 +1,6 @@
 <script setup>
+import BaseButton from '@/components/base/BaseButton.vue'
+import BaseCard from '@/components/base/BaseCard.vue'
 import { computed, onMounted, ref } from 'vue'
 
 const goodsList = ref([])
@@ -93,64 +95,54 @@ onMounted(() => {
 
     <!-- 分类栏 -->
     <view class="flex gap-2">
-      <view
+      <BaseButton
         v-for="item in categories"
         :key="item"
-        class="text-sm px-3 py-1.5 rounded-full border"
-        :class="
-          item === activeCategory
-            ? 'bg-primary text-white border-primary'
-            : 'bg-white text-gray-600 border-gray-200'
-        "
+        :type="item === activeCategory ? 'primary' : 'default'"
+        :text="item"
         @click="activeCategory = item"
-      >
-        {{ item }}
-      </view>
+      />
     </view>
 
     <!-- 排序栏 -->
     <view class="flex gap-2">
-      <view
+      <BaseButton
         v-for="item in sortList"
         :key="item"
-        class="text-sm px-3 py-1.5 rounded-full border"
-        :class="
-          item === activeSort
-            ? 'bg-primary text-white border-primary'
-            : 'bg-white text-gray-600 border-gray-200'
-        "
+        :type="item === activeSort ? 'primary' : 'default'"
+        :text="item"
         @click="activeSort = item"
-        >{{ item }}</view
-      >
+      />
     </view>
 
     <!-- 商品卡片列表 -->
     <view class="space-y-3">
-      <view
+      <BaseCard
         v-for="item in filteredGoods"
         :key="item.id"
-        class="bg-white rounded-lg p-4 shadow-sm flex gap-3"
         @click="goToGroupBuy(item.id)"
       >
-        <view class="w-20 h-20 bg-secondary rounded-md"></view>
-        <view class="flex-1">
-          <text class="block text-base font-bold text-fresh">{{
-            item.name
-          }}</text>
-          <text class="block text-xs text-gray-500 mt-1"
-            >已拼{{ item.sales }}件</text
-          >
-          <view class="mt-2">
-            <text class="text-xs text-primary">￥</text>
-            <text class="text-base font-bold text-primary">{{
-              item.price
+        <view class="flex gap-3">
+          <view class="w-20 h-20 bg-secondary rounded-md"></view>
+          <view class="flex-1">
+            <text class="block text-base font-bold text-fresh">{{
+              item.name
             }}</text>
-            <text class="text-xs text-gray-400 line-through ml-1"
-              >￥{{ item.originalPrice }}</text
+            <text class="block text-xs text-gray-500 mt-1"
+              >已拼{{ item.sales }}件</text
             >
+            <view class="mt-2">
+              <text class="text-xs text-primary">￥</text>
+              <text class="text-base font-bold text-primary">{{
+                item.price
+              }}</text>
+              <text class="text-xs text-gray-400 line-through ml-1"
+                >￥{{ item.originalPrice }}</text
+              >
+            </view>
           </view>
         </view>
-      </view>
+      </BaseCard>
 
       <!-- 加载状态 -->
       <view v-if="loading" class="py-4 text-center">

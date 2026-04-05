@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import BaseButton from '@/components/base/BaseButton.vue'
+import BaseCard from '@/components/base/BaseCard.vue'
+import BaseTag from '@/components/base/BaseTag.vue'
 import { ref, computed } from 'vue'
 
 // --- 模拟数据 ---
@@ -97,19 +100,16 @@ const callPhone = (phone: string) => {
         <text class="text-xs text-[#F08800]">📍 当前定位：阳光花园</text>
       </view>
 
-      <view
+      <BaseCard
         v-for="point in filteredPoints"
         :key="point.id"
-        class="bg-white rounded-lg p-3 mb-3 shadow-sm flex flex-col"
+        class="mb-3"
       >
         <view class="flex justify-between items-start mb-2">
           <text class="text-base font-bold text-[#2F5233]">{{
             point.name
           }}</text>
-          <text
-            class="text-xs text-[#F08800] bg-[#F08800]/10 px-1.5 py-0.5 rounded"
-            >{{ point.distance }}km</text
-          >
+          <BaseTag :kind="'warning'" :text="`${point.distance}km`" />
         </view>
 
         <text class="text-xs text-gray-500 mb-1"
@@ -117,21 +117,11 @@ const callPhone = (phone: string) => {
         >
         <text class="text-xs text-gray-500 mb-3">营业：{{ point.time }}</text>
 
-        <view class="flex border-t border-gray-50 pt-2 mt-auto">
-          <view
-            class="flex-1 flex justify-center items-center border-r border-gray-50 active:bg-gray-50"
-            @click="callPhone(point.phone)"
-          >
-            <text class="text-xs text-gray-600">📞 联系团长</text>
-          </view>
-          <view
-            class="flex-1 flex justify-center items-center active:bg-gray-50"
-            @click="openMap(point)"
-          >
-            <text class="text-xs text-[#F08800]">🗺️ 导航前往</text>
-          </view>
+        <view class="flex gap-2 pt-2 mt-auto">
+          <BaseButton type="default" text="联系团长" @click="callPhone(point.phone)" />
+          <BaseButton text="导航前往" @click="openMap(point)" />
         </view>
-      </view>
+      </BaseCard>
     </view>
   </view>
 </template>
