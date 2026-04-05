@@ -89,7 +89,8 @@ onMounted(() => {
         type="text"
         v-model="keyword"
         placeholder="搜索商品/关键词..."
-        class="flex-1 text-base base-input"
+        placeholder-class="text-gray-400 text-xs"
+        class="flex-1 text-sm base-input base-input--search"
       />
     </view>
 

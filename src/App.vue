@@ -26,6 +26,10 @@ page {
   box-sizing: border-box;
 }
 
+.base-input--search {
+  padding: 20rpx 24rpx;
+}
+
 .base-field__control {
   padding: 0;
 }
