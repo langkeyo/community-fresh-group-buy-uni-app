@@ -29,8 +29,8 @@ page {
 
 .base-input--search {
   padding: 0 24rpx;
-  height: 80rpx;
-  line-height: 80rpx;
+  height: 96rpx;
+  line-height: 96rpx;
 }
 
 .base-field__control {
