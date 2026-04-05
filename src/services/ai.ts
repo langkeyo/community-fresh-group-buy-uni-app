@@ -1,27 +1,21 @@
 import { recommendAiApi } from '@/api/ai'
-
-export interface AiRecipeStep {
-  step: number
-  content: string
-}
-
-export interface AiRecipeCard {
-  id: number
-  title: string
-  tags: string[]
-  image: string
-  desc: string
-  steps: AiRecipeStep[]
-  source: 'DB' | 'AI'
-  disclaimer: string
-}
+import { aiRecommendSchema } from '@/schemas/ai'
+import type { AiRecipeCard } from '@/types/ai'
 
 export async function getAiRecipeRecommend(
   query: string
 ): Promise<AiRecipeCard> {
   const res = await recommendAiApi(query)
-  const data = res.data
-  if (!data?.recipe) {
+  const parsed = aiRecommendSchema.safeParse(res.data)
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0]
+    throw new Error(
+      `AI推荐数据格式异常: ${issue?.path?.join('.') || 'unknown'}`
+    )
+  }
+
+  const data = parsed.data
+  if (!data.recipe) {
     throw new Error('EMPTY_RESULT')
   }
   const hasTitle = Boolean(data.recipe.title)

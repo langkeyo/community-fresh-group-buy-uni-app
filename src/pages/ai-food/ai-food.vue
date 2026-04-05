@@ -2,41 +2,13 @@
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseTag from '@/components/base/BaseTag.vue'
 import { getAiRecipeRecommend } from '@/services/ai'
+import type { AiRecipeHistoryItem, FavoriteItem } from '@/types/ai'
 import { ref } from 'vue'
-
-// --- 类型定义 ---
-interface RecipeStep {
-  step: number
-  content: string
-}
-
-interface RecipeCard {
-  id: number
-  title: string
-  tags: string[]
-  image: string
-  desc: string
-  steps: RecipeStep[]
-  isCollected: boolean
-  timestamp: string
-  source: 'DB' | 'AI'
-  disclaimer: string
-}
-
-interface FavoriteItem {
-  title: string
-  desc: string
-  tags: string[]
-  image: string
-  steps: RecipeStep[]
-  source: 'DB' | 'AI'
-  disclaimer: string
-}
 
 // --- 响应式数据 ---
 const inputValue = ref('')
 const isThinking = ref(false) // AI 是否正在思考
-const chatHistory = ref<RecipeCard[]>([]) // 生成的食谱历史
+const chatHistory = ref<AiRecipeHistoryItem[]>([]) // 生成的食谱历史
 const errorTip = ref('')
 const lastQuery = ref('')
 const FAVORITE_KEY = 'ai_favorites'
@@ -110,7 +82,7 @@ const generateResponse = async (query: string) => {
 }
 
 // 收藏/取消收藏
-const toggleCollect = (card: RecipeCard) => {
+const toggleCollect = (card: AiRecipeHistoryItem) => {
   card.isCollected = !card.isCollected
   const favKey = getFavoriteKey(card)
   if (card.isCollected) {

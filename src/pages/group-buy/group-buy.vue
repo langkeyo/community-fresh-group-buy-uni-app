@@ -2,6 +2,8 @@
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseField from '@/components/base/BaseField.vue'
 import { createOrder } from '@/services/order'
+import { getPickPointDetail } from '@/services/pick-point'
+import { getProductDetail } from '@/services/product'
 import { useUserStore } from '@/stores/user'
 import { onLoad } from '@dcloudio/uni-app'
 import { ref } from 'vue'
@@ -18,6 +20,7 @@ const formData = ref({
 })
 const productId = ref<number | null>(null)
 const pickPointId = ref<number | null>(null)
+const productName = ref('商品')
 
 function validateForm() {
   if (!formData.value.receiverName.trim()) {
@@ -121,7 +124,7 @@ async function handleSubmitGroupBuy(action: 'start' | 'join') {
   }
 }
 
-onLoad((query) => {
+onLoad(async (query) => {
   const id = Number(query?.id)
   productId.value = Number.isFinite(id) && id > 0 ? id : null
 
@@ -130,6 +133,26 @@ onLoad((query) => {
 
   if (pickPointId.value) {
     formData.value.pickupPoint = `自提点#${pickPointId.value}`
+  }
+
+  if (productId.value) {
+    try {
+      const info = await getProductDetail(productId.value)
+      productName.value = info?.name || `商品#${productId.value}`
+    } catch (error: any) {
+      uni.showToast({ title: error?.message || '商品信息加载失败', icon: 'none' })
+    }
+  }
+
+  if (pickPointId.value) {
+    try {
+      const point = await getPickPointDetail(pickPointId.value)
+      if (point) {
+        formData.value.pickupPoint = `${point.name}（${point.address}）`
+      }
+    } catch (error: any) {
+      uni.showToast({ title: error?.message || '自提点信息加载失败', icon: 'none' })
+    }
   }
 })
 </script>
@@ -141,7 +164,7 @@ onLoad((query) => {
     <!-- 商品信息区 -->
     <view class="p-4 space-y-2 bg-white rounded-lg shadow-sm">
       <view class="w-full h-32 rounded-md bg-secondary"></view>
-      <text class="text-base font-bold text-fresh">本地有机番茄 500g</text>
+      <text class="text-base font-bold text-fresh">{{ productName }}</text>
       <view class="flex items-center gap-2">
         <text class="text-xs text-primary">￥</text>
         <text class="text-lg font-bold text-primary">4.99</text>

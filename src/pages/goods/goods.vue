@@ -1,12 +1,14 @@
-<script setup>
+<script setup lang="ts">
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseCard from '@/components/base/BaseCard.vue'
 import { computed, onMounted, ref } from 'vue'
+import { getProductList } from '@/services/product'
+import type { ProductItem } from '@/types/product'
 
-const goodsList = ref([])
+const goodsList = ref<ProductItem[]>([])
 
-const categories = ['全部', '蔬菜', '水果']
-const sortList = ['默认', '价格', '销量']
+const categories = ['全部']
+const sortList = ['默认']
 const activeCategory = ref('全部')
 const activeSort = ref('默认')
 const keyword = ref('')
@@ -14,58 +16,36 @@ const loading = ref(false)
 
 async function fetchGoods() {
   loading.value = true
-  // 模拟请求
-  await new Promise((resolve) => setTimeout(resolve, 1000))
-  goodsList.value = [
-    {
-      id: 1,
-      name: '本地有机番茄 500g',
-      category: '蔬菜',
-      price: '4.99',
-      originalPrice: '8.00',
-      sales: 1200
-    },
-    {
-      id: 2,
-      name: '进口香蕉 1kg',
-      category: '水果',
-      price: '9.90',
-      originalPrice: '15.00',
-      sales: 850
-    },
-    {
-      id: 3,
-      name: '本地小黄瓜 500g',
-      category: '蔬菜',
-      price: '3.20',
-      originalPrice: '6.00',
-      sales: 560
-    }
-  ]
+  try {
+    goodsList.value = await getProductList()
+  } catch (error: any) {
+    uni.showToast({ title: error?.message || '商品加载失败', icon: 'none' })
+    goodsList.value = []
+  }
   loading.value = false
 }
 
 const filteredGoods = computed(() => {
-  let list =
-    activeCategory.value === '全部'
-      ? goodsList.value
-      : goodsList.value.filter((item) => item.category === activeCategory.value)
+  let list = goodsList.value
 
   if (keyword.value.trim()) {
     list = list.filter((item) => item.name.includes(keyword.value.trim()))
   }
 
-  if (activeSort.value === '价格') {
-    list = [...list].sort((a, b) => parseFloat(a.price) - parseFloat(b.price))
-  } else if (activeSort.value === '销量') {
-    list = [...list].sort((a, b) => b.sales - a.sales)
-  }
-
   return list
 })
 
+const viewGoods = computed(() => {
+  return filteredGoods.value.map((item) => ({
+    ...item,
+    price: '--',
+    originalPrice: '',
+    sales: '-'
+  }))
+})
+
 function goToGroupBuy(id) {
-  const pickPointId = 1 // 先最小可用，后续接真实自提点选择
+  const pickPointId = Number(uni.getStorageSync('default_pick_point_id')) || 1
   uni.navigateTo({
     url: `/pages/group-buy/group-buy?id=${id}&pickPointId=${pickPointId}`
   })
@@ -89,7 +69,7 @@ onMounted(() => {
         type="text"
         v-model="keyword"
         placeholder="搜索商品/关键词..."
-        placeholder-class="text-gray-400 text-xs"
+        placeholder-class="text-gray-400 text-sm"
         class="flex-1 text-sm base-input base-input--search"
       />
     </view>
@@ -119,7 +99,7 @@ onMounted(() => {
     <!-- 商品卡片列表 -->
     <view class="space-y-3">
       <BaseCard
-        v-for="item in filteredGoods"
+        v-for="item in viewGoods"
         :key="item.id"
         @click="goToGroupBuy(item.id)"
       >
@@ -130,14 +110,16 @@ onMounted(() => {
               item.name
             }}</text>
             <text class="block text-xs text-gray-500 mt-1"
-              >已拼{{ item.sales }}件</text
+              >商品编号：{{ item.id }}</text
             >
-            <view class="mt-2">
+            <view class="mt-2 flex items-center gap-2">
               <text class="text-xs text-primary">￥</text>
               <text class="text-base font-bold text-primary">{{
                 item.price
               }}</text>
-              <text class="text-xs text-gray-400 line-through ml-1"
+              <text
+                v-if="item.originalPrice"
+                class="text-xs text-gray-400 line-through"
                 >￥{{ item.originalPrice }}</text
               >
             </view>
