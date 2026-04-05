@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import {
-  ORDER_STATUS_FALLBACK,
-  ORDER_STATUS_MAP
-} from '@/constants/order-status'
+import BaseButton from '@/components/base/BaseButton.vue'
+import BaseTag from '@/components/base/BaseTag.vue'
+import { ORDER_STATUS_FALLBACK, ORDER_STATUS_MAP } from '@/constants/order-status'
 import { getOrderDetail, updateStatus } from '@/services/order'
 import { useUserStore } from '@/stores/user'
 import type { OrderInfo } from '@/types/order'
@@ -28,6 +27,14 @@ const currentStatusUI = computed(() => {
   return key !== undefined
     ? ORDER_STATUS_MAP[key] || ORDER_STATUS_FALLBACK
     : ORDER_STATUS_FALLBACK
+})
+
+const currentStatusKind = computed(() => {
+  const s = orderInfo.value?.status
+  if (s === 3) return 'success'
+  if (s === 2) return 'info'
+  if (s === 1) return 'warning'
+  return 'info'
 })
 
 const displayCreateTime = computed(() => {
@@ -142,11 +149,7 @@ function buyAgain() {
       class="p-4 py-8 space-y-3 text-center bg-white rounded-lg shadow-sm"
     >
       <text class="block text-sm text-red-500">{{ errorMsg }}</text>
-      <view
-        class="inline-block px-4 py-2 text-sm text-white rounded-full bg-primary"
-        @click="loadOrderDetail(currentOrderId)"
-        >点击重试</view
-      >
+      <BaseButton text="点击重试" @click="loadOrderDetail(currentOrderId)" />
     </view>
 
     <!-- 3) 成功态 -->
@@ -168,38 +171,15 @@ function buyAgain() {
       <text class="text-sm text-gray-600"
         >下单时间：{{ displayCreateTime }}</text
       >
-      <view
-        class="inline-block px-3 py-1 rounded-full"
-        :class="currentStatusUI.bgClass"
-      >
-        <text class="text-sm" :class="currentStatusUI.textClass">
-          状态：{{ currentStatusUI.label }}
-        </text>
-      </view>
+      <BaseTag :kind="currentStatusKind" :text="`状态：${currentStatusUI.label}`" />
 
-      <view
-        v-if="nextStatus"
-        class="w-full py-3 text-base text-center text-white rounded-full bg-primary"
-        @click="handleUpdateStatus"
-      >
-        {{ nextStatusText }}
+      <view v-if="nextStatus" class="w-full">
+        <BaseButton class="w-full" :text="nextStatusText" @click="handleUpdateStatus" />
       </view>
 
       <view class="flex gap-3 text-center">
-        <view
-          hover-class="scale-95 opacity-80"
-          class="flex-1 py-3 text-base bg-white border rounded-full text-primary border-primary"
-          @click="goBackToOrder"
-        >
-          返回订单
-        </view>
-        <view
-          hover-class="scale-95 opacity-80"
-          class="flex-1 py-3 text-base text-white rounded-full bg-primary active:scale-95"
-          @click="buyAgain"
-        >
-          再次购买
-        </view>
+        <BaseButton class="flex-1" type="default" text="返回订单" @click="goBackToOrder" />
+        <BaseButton class="flex-1" text="再次购买" @click="buyAgain" />
       </view>
     </view>
 

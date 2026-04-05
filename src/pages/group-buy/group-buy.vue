@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import BaseButton from '@/components/base/BaseButton.vue'
+import BaseField from '@/components/base/BaseField.vue'
 import { createOrder } from '@/services/order'
 import { useUserStore } from '@/stores/user'
 import { onLoad } from '@dcloudio/uni-app'
@@ -177,41 +179,31 @@ onLoad((query) => {
 
       <!-- 选择人数 -->
       <view class="flex gap-3">
-        <view
-          class="text-sm px-3 py-1.5 rounded-full"
-          :class="
-            formData.groupType === 2
-              ? 'bg-primary text-white'
-              : 'bg-white text-gray-600 border border-gray-200'
-          "
+        <BaseButton
+          :type="formData.groupType === 2 ? 'primary' : 'default'"
+          text="2人团"
           @click="formData.groupType = 2"
-          >2人团</view
-        >
-        <view
-          class="text-sm px-3 py-1.5 rounded-full"
-          :class="
-            formData.groupType === 3
-              ? 'bg-primary text-white'
-              : 'bg-white text-gray-600 border border-gray-200'
-          "
+        />
+        <BaseButton
+          :type="formData.groupType === 3 ? 'primary' : 'default'"
+          text="3人团"
           @click="formData.groupType = 3"
-          >3人团</view
-        >
+        />
       </view>
 
       <!-- 收件人 -->
-      <view class="px-3 py-2 border border-gray-200 rounded-md bg-gray-50">
+      <BaseField label="收件人" required>
         <input
           v-model="formData.receiverName"
           type="text"
           placeholder="收件人姓名"
           class="text-base"
         />
-      </view>
+      </BaseField>
 
       <!-- 电话 -->
       <!-- 这里 type="number" 会优先弹起数字键盘，优化用户输入体验 -->
-      <view class="px-3 py-2 border border-gray-200 rounded-md bg-gray-50">
+      <BaseField label="手机号" required>
         <input
           v-model="formData.mobile"
           type="number"
@@ -219,38 +211,33 @@ onLoad((query) => {
           placeholder="手机号"
           class="text-base"
         />
-      </view>
+      </BaseField>
 
       <!-- 自提点 -->
-      <view class="px-3 py-2 border border-gray-200 rounded-md bg-gray-50">
+      <BaseField label="自提点">
         <text class="text-base text-gray-700">
           {{ formData.pickupPoint || '默认自提点（后续接真实选择）' }}
         </text>
-      </view>
+      </BaseField>
     </view>
 
     <!-- 按钮区 -->
     <view class="flex gap-3">
-      <view
-        hover-class="scale-95"
-        class="flex-1 py-3 text-base text-center text-white transition-all duration-300 border rounded-full border-primary"
-        :class="isSubmitting ? 'bg-primary/60 opacity-60' : 'bg-primary'"
+      <BaseButton
+        class="flex-1"
+        :loading="isSubmitting && currentAction === 'start'"
+        :disabled="isSubmitting"
+        text="发起拼团"
         @click="handleSubmitGroupBuy('start')"
-      >
-        {{
-          isSubmitting && currentAction === 'start' ? '提交中...' : '发起拼团'
-        }}
-      </view>
-      <view
-        hover-class="scale-95"
-        class="flex-1 py-3 text-base text-center transition-all duration-300 border rounded-full border-primary text-primary"
-        :class="isSubmitting ? 'bg-white/60 opacity-60' : 'bg-white'"
+      />
+      <BaseButton
+        class="flex-1"
+        type="default"
+        :loading="isSubmitting && currentAction === 'join'"
+        :disabled="isSubmitting"
+        text="加入拼团"
         @click="handleSubmitGroupBuy('join')"
-      >
-        {{
-          isSubmitting && currentAction === 'join' ? '加入中...' : '加入拼团'
-        }}
-      </view>
+      />
     </view>
 
     <!-- 成团提示 -->

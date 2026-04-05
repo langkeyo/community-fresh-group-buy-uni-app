@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import BaseButton from '@/components/base/BaseButton.vue'
+import BaseTag from '@/components/base/BaseTag.vue'
 import { getAiRecipeRecommend } from '@/services/ai'
 import { ref } from 'vue'
 
@@ -213,12 +215,7 @@ loadFavorites()
       >
         <text class="text-sm text-red-500">{{ errorTip }}</text>
         <view class="mt-3">
-          <view
-            class="inline-flex items-center px-4 py-2 bg-[#F08800] text-white text-sm rounded-full"
-            @click="retryLast"
-          >
-            重试
-          </view>
+          <BaseButton text="重试" @click="retryLast" />
         </view>
       </view>
     </view>
@@ -254,16 +251,10 @@ loadFavorites()
                 <text class="text-lg font-bold text-[#2F5233]">{{
                   card.title
                 }}</text>
-                <text
-                  class="inline-flex items-center text-[20rpx] px-2 py-0.5 rounded-full border"
-                  :class="
-                    card.source === 'DB'
-                      ? 'bg-green-50 text-green-700 border-green-200'
-                      : 'bg-orange-50 text-orange-700 border-orange-200'
-                  "
-                >
-                  {{ card.source === 'DB' ? '词典命中' : 'AI生成' }}
-                </text>
+                <BaseTag
+                  :kind="card.source === 'DB' ? 'success' : 'warning'"
+                  :text="card.source === 'DB' ? '词典命中' : 'AI生成'"
+                />
               </view>
               <view class="mt-0.5" @click="toggleCollect(card)">
                 <text
@@ -329,12 +320,7 @@ loadFavorites()
       <view v-if="errorTip" class="bg-white rounded-xl p-4 border border-red-100">
         <text class="text-sm text-red-500">{{ errorTip }}</text>
         <view class="mt-3">
-          <view
-            class="inline-flex items-center px-4 py-2 bg-[#F08800] text-white text-sm rounded-full"
-            @click="retryLast"
-          >
-            重试
-          </view>
+          <BaseButton text="重试" @click="retryLast" />
         </view>
       </view>
 

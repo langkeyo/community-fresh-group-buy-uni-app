@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import {
-  ORDER_STATUS_FALLBACK,
-  ORDER_STATUS_MAP
-} from '@/constants/order-status'
+import BaseButton from '@/components/base/BaseButton.vue'
+import BaseTag from '@/components/base/BaseTag.vue'
+import { ORDER_STATUS_FALLBACK, ORDER_STATUS_MAP } from '@/constants/order-status'
 import { getOrderList } from '@/services/order'
 import { useUserStore } from '@/stores/user'
 import type { OrderInfo } from '@/types/order'
@@ -55,6 +54,13 @@ function goToOrderDetail(id: string) {
 
 function getStatusUI(status: number) {
   return ORDER_STATUS_MAP[status] || ORDER_STATUS_FALLBACK
+}
+
+function getStatusKind(status: number) {
+  if (status === 3) return 'success'
+  if (status === 2) return 'info'
+  if (status === 1) return 'warning'
+  return 'info'
 }
 
 async function loadOrderList() {
@@ -114,12 +120,7 @@ onShow(() => {
 
     <view v-else-if="errorMsg" class="py-8 space-y-3 text-center">
       <text class="block text-sm text-red-500">{{ errorMsg }}</text>
-      <view
-        class="inline-block px-4 py-2 text-sm text-white rounded-full bg-primary"
-        @click="loadOrderList"
-      >
-        点击重试
-      </view>
+      <BaseButton text="点击重试" @click="loadOrderList" />
     </view>
 
     <view v-else class="space-y-3">
@@ -131,11 +132,7 @@ onShow(() => {
       >
         <view class="flex justify-between text-sm text-gray-600">
           <text>订单号：{{ item.no }}</text>
-          <view class="px-2 py-0.5 rounded-full" :class="item.statusUI.bgClass">
-            <text class="text-xs" :class="item.statusUI.textClass">
-              {{ item.statusUI.label }}
-            </text>
-          </view>
+          <BaseTag :kind="getStatusKind(item.status)" :text="item.statusUI.label" />
         </view>
         <text class="text-base font-bold text-fresh">{{ item.name }}</text>
         <view class="flex justify-between text-sm text-gray-600">
