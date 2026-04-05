@@ -187,7 +187,10 @@ onLoad(async (query) => {
 </script>
 
 <template>
-  <view class="min-h-screen px-4 pt-4 space-y-4 bg-gray-50">
+  <view
+    class="min-h-screen px-4 pt-4 space-y-4 bg-gray-50"
+    style="padding-bottom: 140rpx;"
+  >
     <text class="text-base font-bold text-fresh">拼团详情</text>
 
     <!-- 商品信息区 -->
@@ -281,24 +284,8 @@ onLoad(async (query) => {
       </BaseField>
     </view>
 
-    <!-- 按钮区 -->
-    <view class="flex gap-3">
-      <BaseButton
-        class="flex-1"
-        :loading="isSubmitting && currentAction === 'start'"
-        :disabled="isSubmitting || (productDetail?.stock ?? 0) <= 0"
-        text="发起拼团"
-        @click="handleSubmitGroupBuy('start')"
-      />
-      <BaseButton
-        class="flex-1"
-        type="default"
-        :loading="isSubmitting && currentAction === 'join'"
-        :disabled="isSubmitting || (productDetail?.stock ?? 0) <= 0"
-        text="加入拼团"
-        @click="handleSubmitGroupBuy('join')"
-      />
-    </view>
+    <!-- 占位：给底部固定按钮留出空间 -->
+    <view class="h-8"></view>
 
     <view
       v-if="productDetail?.stock !== undefined && productDetail.stock <= 0"
@@ -312,6 +299,28 @@ onLoad(async (query) => {
       class="bg-[#FFF7E6] border border-primary/30 text-primary rounded-lg p-3 text-sm"
     >
       🎉 已成团！请前往订单页查看取货信息
+    </view>
+    <view
+      class="fixed left-0 right-0 bottom-0 bg-white border-t border-gray-100 px-4 pt-3"
+      style="padding-bottom: calc(env(safe-area-inset-bottom) + 12rpx);"
+    >
+      <view class="flex gap-3">
+        <BaseButton
+          class="flex-1"
+          :loading="isSubmitting && currentAction === 'start'"
+          :disabled="isSubmitting || (productDetail?.stock ?? 0) <= 0"
+          text="发起拼团"
+          @click="handleSubmitGroupBuy('start')"
+        />
+        <BaseButton
+          class="flex-1"
+          type="default"
+          :loading="isSubmitting && currentAction === 'join'"
+          :disabled="isSubmitting || (productDetail?.stock ?? 0) <= 0"
+          text="加入拼团"
+          @click="handleSubmitGroupBuy('join')"
+        />
+      </view>
     </view>
   </view>
 </template>

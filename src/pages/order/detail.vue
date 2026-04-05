@@ -179,8 +179,15 @@ function buyAgain() {
     <!-- 3) 成功态 -->
     <view
       v-else-if="found"
-      class="flex flex-col p-8 space-y-4 bg-white rounded-lg shadow-sm"
+      class="flex flex-col p-6 space-y-4 bg-white rounded-lg shadow-sm"
     >
+      <view v-if="productDetail?.images?.length" class="w-full">
+        <image
+          :src="productDetail.images[0]"
+          mode="aspectFill"
+          class="w-full h-40 rounded-md bg-gray-100"
+        />
+      </view>
       <text class="text-sm text-gray-600">订单号：{{ orderInfo?.no }}</text>
       <text class="text-base font-bold text-fresh">{{ orderInfo?.name }}</text>
 
@@ -197,6 +204,10 @@ function buyAgain() {
           >({{ priceLabel }})</text
         >
       </text>
+      <view v-if="productDetail" class="bg-gray-50 rounded-lg p-3 text-sm text-gray-600">
+        <text class="block">团购价(2人)：￥{{ (productDetail.groupPrice2 ?? productDetail.price).toFixed(2) }}</text>
+        <text class="block">团购价(3人)：￥{{ (productDetail.groupPrice3 ?? productDetail.price).toFixed(2) }}</text>
+      </view>
       <text class="text-sm text-gray-600"
         >下单时间：{{ displayCreateTime }}</text
       >
