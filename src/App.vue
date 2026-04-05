@@ -21,13 +21,16 @@ page {
 }
 
 .base-input {
-  padding: 16rpx 20rpx;
-  min-height: 72rpx;
+  padding: 0 20rpx;
+  height: 72rpx;
+  line-height: 72rpx;
   box-sizing: border-box;
 }
 
 .base-input--search {
-  padding: 20rpx 24rpx;
+  padding: 0 24rpx;
+  height: 80rpx;
+  line-height: 80rpx;
 }
 
 .base-field__control {
