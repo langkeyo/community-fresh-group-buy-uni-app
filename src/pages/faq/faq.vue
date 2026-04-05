@@ -16,12 +16,12 @@ const faqList = [
 </script>
 
 <template>
-  <view class="min-h-screen bg-gray-50 p-4 space-y-4">
-    <view class="bg-white rounded-xl p-4 shadow-sm">
-      <text class="text-base font-bold text-fresh block mb-2">常见问题</text>
-      <view v-for="item in faqList" :key="item.q" class="py-3 border-b border-gray-100">
-        <text class="text-sm font-bold text-[#2F5233] block">{{ item.q }}</text>
-        <text class="text-xs text-gray-500 block mt-1">{{ item.a }}</text>
+  <view class="min-h-screen bg-gray-50 p-6 space-y-6">
+    <view class="bg-white rounded-xl p-6 shadow-sm">
+      <text class="text-lg font-bold text-fresh block mb-4">常见问题</text>
+      <view v-for="item in faqList" :key="item.q" class="py-4 border-b border-gray-100">
+        <text class="text-base font-bold text-[#2F5233] block">{{ item.q }}</text>
+        <text class="text-sm text-gray-500 block mt-2">{{ item.a }}</text>
       </view>
     </view>
   </view>

@@ -249,20 +249,20 @@ const handleToolClick = (route: string) => {
       <view
         v-for="(item, index) in tools"
         :key="index"
-        class="flex items-center justify-between p-4 border-b border-gray-50 active:bg-gray-50"
+        class="flex items-center justify-between p-5 border-b border-gray-50 active:bg-gray-50"
         @click="handleToolClick(item.route)"
       >
         <view class="flex items-center">
           <view class="mr-3 w-6 flex justify-center">
             <uni-icons
               :type="item.icon"
-              size="22"
+              size="24"
               :color="item.color"
             ></uni-icons>
           </view>
-          <text class="text-sm text-[#2F5233]">{{ item.name }}</text>
+          <text class="text-base text-[#2F5233]">{{ item.name }}</text>
         </view>
-        <uni-icons type="right" size="14" color="#cccccc"></uni-icons>
+        <uni-icons type="right" size="16" color="#cccccc"></uni-icons>
       </view>
     </view>
 
@@ -274,7 +274,7 @@ const handleToolClick = (route: string) => {
         color="#e5e7eb"
         class="mb-1"
       ></uni-icons>
-      <text class="text-[20rpx] text-gray-300"
+      <text class="text-[24rpx] text-gray-300"
         >Ligo生鲜 V1.0.0 Built by UniApp</text
       >
     </view>
