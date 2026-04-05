@@ -20,7 +20,7 @@ const props = withDefaults(
       <text v-if="required" class="text-sm text-red-500">*</text>
     </view>
     <view
-      class="px-4 py-3 border rounded-lg bg-gray-50"
+      class="border rounded-lg bg-gray-50 base-field__control"
       :class="error ? 'border-red-400' : 'border-gray-200'"
     >
       <slot />

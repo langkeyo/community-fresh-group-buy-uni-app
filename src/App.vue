@@ -20,6 +20,21 @@ page {
   animation: pageFadeIn 0.25s ease;
 }
 
+.base-input {
+  padding: 16rpx 20rpx;
+  min-height: 72rpx;
+  box-sizing: border-box;
+}
+
+.base-field__control {
+  padding: 0;
+}
+
+.base-field__text {
+  padding: 16rpx 20rpx;
+  display: block;
+}
+
 @keyframes pageFadeIn {
   from {
     opacity: 0;

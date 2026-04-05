@@ -197,7 +197,7 @@ onLoad((query) => {
           v-model="formData.receiverName"
           type="text"
           placeholder="收件人姓名"
-          class="w-full text-base py-2 px-2"
+          class="w-full text-base base-input"
         />
       </BaseField>
 
@@ -209,13 +209,13 @@ onLoad((query) => {
           type="number"
           :maxlength="11"
           placeholder="手机号"
-          class="w-full text-base py-2 px-2"
+          class="w-full text-base base-input"
         />
       </BaseField>
 
       <!-- 自提点 -->
       <BaseField label="自提点">
-        <text class="text-base text-gray-700">
+        <text class="text-base text-gray-700 base-field__text">
           {{ formData.pickupPoint || '默认自提点（后续接真实选择）' }}
         </text>
       </BaseField>

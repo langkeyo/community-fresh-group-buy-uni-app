@@ -351,7 +351,7 @@ loadFavorites()
           confirm-type="send"
           placeholder="输入食材或菜名（如：番茄）"
           placeholder-class="text-gray-400 text-sm"
-          class="flex-1 h-10 px-4 py-2 text-sm text-[#2F5233]"
+          class="flex-1 text-sm text-[#2F5233] base-input"
           @confirm="handleSend"
         />
         <view
