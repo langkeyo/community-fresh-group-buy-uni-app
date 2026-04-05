@@ -1,39 +1,91 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import BaseButton from '@/components/base/BaseButton.vue'
+import { getPickPointDetail } from '@/services/pick-point'
+import { getLeaderOrderList, leaderConfirmPick } from '@/services/order'
+import type { OrderInfo } from '@/types/order'
+import type { UserInfo } from '@/types/user'
+import { onShow } from '@dcloudio/uni-app'
+import { computed, ref } from 'vue'
 
-// --- 模拟数据 ---
-const stats = ref({
-  commission: '1,280.50',
-  todayIncome: '45.00',
-  members: 126,
-  orders: 8
-})
+const userInfo = ref<UserInfo | null>(null)
+const pickPointName = ref('')
+const pickPointAddress = ref('')
+const pickPointId = ref<number | null>(null)
+const loading = ref(false)
+const errorMsg = ref('')
+const pendingOrders = ref<OrderInfo[]>([])
 
-const pendingAuditList = ref([
-  {
-    id: 101,
-    user: '陈阿姨',
-    goods: '红富士苹果 5斤',
-    time: '10:30',
-    status: 'pending'
-  },
-  {
-    id: 102,
-    user: '张建国',
-    goods: '大白菜 2颗',
-    time: '11:15',
-    status: 'pending'
+const pendingCount = computed(() => pendingOrders.value.length)
+
+const loadUserInfo = () => {
+  const stored = uni.getStorageSync('userInfo')
+  if (!stored) {
+    userInfo.value = null
+    return
   }
-])
-
-// --- 方法 ---
-const handleAudit = (id: number) => {
-  uni.showToast({ title: '核销成功', icon: 'success' })
-  // 移除该项
-  pendingAuditList.value = pendingAuditList.value.filter(
-    (item) => item.id !== id
-  )
+  userInfo.value = typeof stored === 'string' ? JSON.parse(stored) : stored
 }
+
+const loadPickPoint = async () => {
+  const id = Number(uni.getStorageSync('default_pick_point_id'))
+  if (!id) {
+    pickPointId.value = null
+    return
+  }
+  pickPointId.value = id
+  try {
+    const detail = await getPickPointDetail(id)
+    pickPointName.value = detail?.name || ''
+    pickPointAddress.value = detail?.address || ''
+  } catch (error: any) {
+    uni.showToast({ title: error?.message || '自提点信息加载失败', icon: 'none' })
+  }
+}
+
+const loadLeaderOrders = async () => {
+  if (!userInfo.value?.id || !pickPointId.value) return
+  loading.value = true
+  errorMsg.value = ''
+  try {
+    pendingOrders.value = await getLeaderOrderList(
+      userInfo.value.id,
+      pickPointId.value,
+      2
+    )
+  } catch (error: any) {
+    errorMsg.value = error?.message || '待核销订单加载失败'
+    pendingOrders.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+const handleConfirm = async (id: string) => {
+  if (!userInfo.value?.id || !pickPointId.value) return
+  try {
+    await leaderConfirmPick(id, userInfo.value.id, pickPointId.value)
+    uni.showToast({ title: '核销成功', icon: 'success' })
+    uni.setStorageSync('order_need_refresh', true)
+    await loadLeaderOrders()
+  } catch (error: any) {
+    uni.showToast({ title: error?.message || '核销失败', icon: 'none' })
+  }
+}
+
+const goToPickPoint = () => {
+  uni.navigateTo({ url: '/pages/self-pick/self-pick' })
+}
+
+onShow(async () => {
+  loadUserInfo()
+  if (!userInfo.value?.isLeader) {
+    uni.showToast({ title: '仅团长可访问', icon: 'none' })
+    return
+  }
+  await loadPickPoint()
+  if (!pickPointId.value) return
+  await loadLeaderOrders()
+})
 </script>
 
 <template>
@@ -46,42 +98,37 @@ const handleAudit = (id: number) => {
           class="w-12 h-12 rounded-full border-2 border-white mr-3"
         />
         <view>
-          <text class="text-white font-bold text-lg block">王阿姨（团长）</text>
-          <text class="text-white/80 text-xs">阳光花园一期自提点</text>
+          <text class="text-white font-bold text-lg block">{{
+            userInfo?.nickname || '团长'
+          }}</text>
+          <text class="text-white/80 text-xs">{{
+            pickPointName || '未选择自提点'
+          }}</text>
         </view>
       </view>
 
       <view class="flex justify-between text-white">
         <view class="flex flex-col">
-          <text class="text-3xl font-bold">{{ stats.commission }}</text>
-          <text class="text-xs opacity-80">累计佣金(元)</text>
+          <text class="text-3xl font-bold">{{ pendingCount }}</text>
+          <text class="text-xs opacity-80">待核销订单</text>
         </view>
         <view class="flex flex-col items-end">
-          <text class="text-xl font-bold">{{ stats.todayIncome }}</text>
-          <text class="text-xs opacity-80">今日预估(元)</text>
+          <text class="text-xl font-bold">团长</text>
+          <text class="text-xs opacity-80">身份已认证</text>
         </view>
       </view>
     </view>
 
     <!-- 数据概览 -->
     <view
-      class="mx-4 -mt-8 bg-white rounded-xl shadow-sm p-4 flex justify-around mb-4"
+      class="mx-4 -mt-8 bg-white rounded-xl shadow-sm p-4 space-y-2 mb-4"
     >
-      <view class="flex flex-col items-center">
-        <text class="text-lg font-bold text-[#2F5233]">{{
-          stats.members
-        }}</text>
-        <text class="text-xs text-gray-500">我的团员</text>
-      </view>
-      <view class="w-[1px] bg-gray-100 h-8"></view>
-      <view class="flex flex-col items-center">
-        <text class="text-lg font-bold text-[#2F5233]">{{ stats.orders }}</text>
-        <text class="text-xs text-gray-500">今日订单</text>
-      </view>
-      <view class="w-[1px] bg-gray-100 h-8"></view>
-      <view class="flex flex-col items-center">
-        <text class="text-lg font-bold text-[#2F5233]">98%</text>
-        <text class="text-xs text-gray-500">好评率</text>
+      <text class="text-xs text-gray-500">自提点地址</text>
+      <text class="text-sm text-gray-700">{{
+        pickPointAddress || '请先选择自提点'
+      }}</text>
+      <view v-if="!pickPointId" class="pt-2">
+        <BaseButton text="去选择自提点" @click="goToPickPoint" />
       </view>
     </view>
 
@@ -92,26 +139,37 @@ const handleAudit = (id: number) => {
         >待核销订单</view
       >
 
-      <view
-        v-for="item in pendingAuditList"
-        :key="item.id"
-        class="bg-white p-3 rounded-lg mb-2 shadow-sm flex items-center justify-between"
-      >
-        <view>
-          <view class="text-sm font-bold text-gray-800">{{ item.user }}</view>
-          <text class="text-xs text-gray-500">{{ item.goods }}</text>
-          <text class="text-xs text-gray-400 ml-2">{{ item.time }}</text>
-        </view>
-        <button
-          class="bg-[#E8F5E9] text-[#2F5233] text-xs px-3 py-1 rounded-full border border-[#2F5233]/20 m-0"
-          @click="handleAudit(item.id)"
+      <view v-if="loading" class="py-4 text-center">
+        <text class="text-xs text-gray-400">加载中...</text>
+      </view>
+
+      <view v-else-if="errorMsg" class="py-4 text-center">
+        <text class="text-xs text-red-500">{{ errorMsg }}</text>
+      </view>
+
+      <view v-else>
+        <view
+          v-for="item in pendingOrders"
+          :key="item.id"
+          class="bg-white p-3 rounded-lg mb-2 shadow-sm space-y-2"
         >
-          确认提货
-        </button>
+          <view class="flex justify-between">
+            <view>
+              <view class="text-sm font-bold text-gray-800">{{ item.name }}</view>
+              <text class="text-xs text-gray-500">订单号：{{ item.no }}</text>
+            </view>
+            <text class="text-xs text-gray-400">{{
+              item.createTime || '-'
+            }}</text>
+          </view>
+          <view class="flex justify-end">
+            <BaseButton text="确认提货" @click="handleConfirm(item.id)" />
+          </view>
+        </view>
       </view>
 
       <view
-        v-if="pendingAuditList.length === 0"
+        v-if="!loading && !errorMsg && pendingOrders.length === 0"
         class="text-center py-6 text-gray-400 text-xs"
       >
         今日订单已全部核销完成

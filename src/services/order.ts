@@ -2,6 +2,8 @@ import {
   createOrderApi,
   getOrderDetailApi,
   getOrderListApi,
+  getLeaderOrderListApi,
+  leaderConfirmPickApi,
   updateStatusApi,
   type BackendOrderItem,
   type CreateOrderReq
@@ -72,5 +74,31 @@ export async function updateStatus(
   status: number
 ): Promise<string> {
   const res = await updateStatusApi(orderId, status)
+  return res.data
+}
+
+export async function getLeaderOrderList(
+  leaderId: number,
+  pickPointId: number,
+  status?: number
+): Promise<OrderInfo[]> {
+  const res = await getLeaderOrderListApi(leaderId, pickPointId, status)
+  const list = res.data ?? []
+  const parsed = backendOrderListSchema.safeParse(list)
+  if (!parsed?.success) {
+    const issue = parsed.error.issues[0]
+    throw new Error(
+      `团长订单数据格式异常: ${issue?.path?.join('.') || 'unknown'}`
+    )
+  }
+  return parsed.data.map(mapBackendOrderToOrderInfo)
+}
+
+export async function leaderConfirmPick(
+  orderId: string | number,
+  leaderId: number,
+  pickPointId: number
+): Promise<string> {
+  const res = await leaderConfirmPickApi(orderId, leaderId, pickPointId)
   return res.data
 }

@@ -45,3 +45,23 @@ export const updateStatusApi = (orderId: number | string, status: number) => {
     `/api/order/updateStatus/${orderId}?status=${status}`
   ) as unknown as Promise<Result<string>>
 }
+
+export const getLeaderOrderListApi = (
+  leaderId: number,
+  pickPointId: number,
+  status?: number
+) => {
+  return http.get<Result<BackendOrderItem[]>>('/api/order/leader/list', {
+    params: { leaderId, pickPointId, status }
+  }) as unknown as Promise<Result<BackendOrderItem[]>>
+}
+
+export const leaderConfirmPickApi = (
+  orderId: string | number,
+  leaderId: number,
+  pickPointId: number
+) => {
+  return http.put<Result<string>>(
+    `/api/order/leader/confirm/${orderId}?leaderId=${leaderId}&pickPointId=${pickPointId}`
+  ) as unknown as Promise<Result<string>>
+}

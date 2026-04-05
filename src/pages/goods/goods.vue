@@ -118,12 +118,20 @@ onMounted(() => {
             <text class="block text-xs text-gray-500 mt-1"
               >商品编号：{{ item.id }}</text
             >
-            <view class="mt-2 flex items-center gap-2 text-gray-400">
-              <text class="text-xs">￥</text>
-              <text class="text-sm">{{ item.price }}</text>
-              <text v-if="item.originalPrice" class="text-xs line-through"
-                >￥{{ item.originalPrice }}</text
+            <view class="mt-2">
+              <text
+                v-if="item.price === '--'"
+                class="text-xs text-gray-400"
               >
+                价格待完善
+              </text>
+              <view v-else class="flex items-center gap-2 text-gray-400">
+                <text class="text-xs">￥</text>
+                <text class="text-sm">{{ item.price }}</text>
+                <text v-if="item.originalPrice" class="text-xs line-through"
+                  >￥{{ item.originalPrice }}</text
+                >
+              </view>
             </view>
           </view>
         </view>

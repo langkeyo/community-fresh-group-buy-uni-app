@@ -15,10 +15,14 @@ const loading = ref(true)
 const errorMsg = ref('')
 const isNavigating = ref(false)
 const currentOrderId = ref('')
+const isLeader = ref(false)
 
 onLoad((query) => {
   const id = String(query?.id || '')
   currentOrderId.value = id
+  const stored = uni.getStorageSync('userInfo')
+  const info = stored ? (typeof stored === 'string' ? JSON.parse(stored) : stored) : null
+  isLeader.value = Boolean(info?.isLeader)
   loadOrderDetail(id)
 })
 
@@ -173,7 +177,7 @@ function buyAgain() {
       >
       <BaseTag :kind="currentStatusKind" :text="`状态：${currentStatusUI.label}`" />
 
-      <view v-if="nextStatus" class="w-full">
+      <view v-if="nextStatus && isLeader" class="w-full">
         <BaseButton class="w-full" :text="nextStatusText" @click="handleUpdateStatus" />
       </view>
 
