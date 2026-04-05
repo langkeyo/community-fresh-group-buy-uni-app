@@ -10,10 +10,11 @@ const userInfo = ref<UserInfo | null>(null)
 
 // 默认的工具栏数据
 const tools = [
-  { name: '收货地址', icon: 'location', color: '#F08800' },
-  { name: '联系客服', icon: 'headphones', color: '#2F5233' },
-  { name: '常见问题', icon: 'help', color: '#666666' },
-  { name: '关于我们', icon: 'info', color: '#666666' }
+  { name: '收货地址', icon: 'location', color: '#F08800', route: '/pages/address/address' },
+  { name: '自提网点', icon: 'location', color: '#2F5233', route: '/pages/self-pick/self-pick' },
+  { name: '联系客服', icon: 'headphones', color: '#2F5233', route: '/pages/service/service' },
+  { name: '常见问题', icon: 'help', color: '#666666', route: '/pages/faq/faq' },
+  { name: '关于我们', icon: 'info', color: '#666666', route: '/pages/about/about' }
 ]
 
 // --- 生命周期 ---
@@ -106,6 +107,10 @@ const handleSetting = () => {
       }
     }
   })
+}
+
+const handleToolClick = (route: string) => {
+  uni.navigateTo({ url: route })
 }
 </script>
 
@@ -245,6 +250,7 @@ const handleSetting = () => {
         v-for="(item, index) in tools"
         :key="index"
         class="flex items-center justify-between p-4 border-b border-gray-50 active:bg-gray-50"
+        @click="handleToolClick(item.route)"
       >
         <view class="flex items-center">
           <view class="mr-3 w-6 flex justify-center">
