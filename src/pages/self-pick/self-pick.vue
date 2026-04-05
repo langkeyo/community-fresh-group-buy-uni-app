@@ -9,6 +9,7 @@ import { ref, computed, onMounted } from 'vue'
 const keyword = ref('')
 const points = ref<PickPointItem[]>([])
 const loading = ref(false)
+const selectedPickId = ref<number | null>(null)
 
 // --- 计算属性 ---
 const filteredPoints = computed(() => {
@@ -33,12 +34,6 @@ const loadPickPoints = async () => {
   loading.value = true
   try {
     points.value = await getPickPointList()
-    if (points.value.length > 0) {
-      const firstId = points.value[0].id
-      if (Number.isFinite(firstId)) {
-        uni.setStorageSync('default_pick_point_id', firstId)
-      }
-    }
   } catch (error: any) {
     uni.showToast({ title: error?.message || '自提点加载失败', icon: 'none' })
     points.value = []
@@ -47,8 +42,20 @@ const loadPickPoints = async () => {
   }
 }
 
+const syncSelectedPick = () => {
+  const stored = Number(uni.getStorageSync('default_pick_point_id'))
+  selectedPickId.value = Number.isFinite(stored) && stored > 0 ? stored : null
+}
+
+const setDefaultPick = (point: PickPointItem) => {
+  uni.setStorageSync('default_pick_point_id', point.id)
+  selectedPickId.value = point.id
+  uni.showToast({ title: '已设为默认自提点', icon: 'success' })
+}
+
 onMounted(() => {
   loadPickPoints()
+  syncSelectedPick()
 })
 </script>
 
@@ -82,13 +89,21 @@ onMounted(() => {
           <text class="text-base font-bold text-[#2F5233]">{{
             point.name
           }}</text>
-          <BaseTag :kind="'info'" text="自提点" />
+          <BaseTag
+            :kind="point.id === selectedPickId ? 'success' : 'info'"
+            :text="point.id === selectedPickId ? '默认' : '自提点'"
+          />
         </view>
 
         <text class="text-xs text-gray-500 mb-1"
           >地址：{{ point.address }}</text
         >
         <view class="flex gap-2 pt-2 mt-auto">
+          <BaseButton
+            type="default"
+            :text="point.id === selectedPickId ? '默认自提点' : '设为默认'"
+            @click="setDefaultPick(point)"
+          />
           <BaseButton text="导航前往" @click="openMap(point)" />
         </view>
       </BaseCard>
