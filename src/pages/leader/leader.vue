@@ -14,6 +14,7 @@ const pickPointId = ref<number | null>(null)
 const loading = ref(false)
 const errorMsg = ref('')
 const pendingOrders = ref<OrderInfo[]>([])
+const recentConfirmList = ref<OrderInfo[]>([])
 
 const pendingCount = computed(() => pendingOrders.value.length)
 
@@ -66,6 +67,10 @@ const handleConfirm = async (id: string) => {
     await leaderConfirmPick(id, userInfo.value.id, pickPointId.value)
     uni.showToast({ title: '核销成功', icon: 'success' })
     uni.setStorageSync('order_need_refresh', true)
+    const target = pendingOrders.value.find((item) => item.id === id)
+    if (target) {
+      recentConfirmList.value = [target, ...recentConfirmList.value].slice(0, 5)
+    }
     await loadLeaderOrders()
   } catch (error: any) {
     uni.showToast({ title: error?.message || '核销失败', icon: 'none' })
@@ -185,6 +190,28 @@ onPullDownRefresh(async () => {
         class="text-center py-6 text-gray-400 text-xs"
       >
         今日订单已全部核销完成
+      </view>
+    </view>
+
+    <view class="px-4 pb-6">
+      <view
+        class="text-base font-bold text-[#2F5233] mb-3 border-l-4 border-[#F08800] pl-2"
+        >最近核销</view
+      >
+      <view
+        v-if="recentConfirmList.length === 0"
+        class="text-center py-6 text-gray-400 text-xs"
+      >
+        暂无核销记录
+      </view>
+      <view
+        v-for="item in recentConfirmList"
+        :key="item.id"
+        class="bg-white p-3 rounded-lg mb-2 shadow-sm space-y-1"
+      >
+        <text class="text-sm font-bold text-gray-800">{{ item.name }}</text>
+        <text class="text-xs text-gray-500">订单号：{{ item.no }}</text>
+        <text class="text-xs text-gray-400">核销时间：{{ item.createTime || '-' }}</text>
       </view>
     </view>
   </view>

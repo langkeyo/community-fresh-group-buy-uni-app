@@ -3,6 +3,8 @@ import BaseButton from '@/components/base/BaseButton.vue'
 import BaseTag from '@/components/base/BaseTag.vue'
 import { ORDER_STATUS_FALLBACK, ORDER_STATUS_MAP } from '@/constants/order-status'
 import { getOrderDetail, updateStatus } from '@/services/order'
+import { getProductDetail } from '@/services/product'
+import type { ProductItem } from '@/types/product'
 import { useUserStore } from '@/stores/user'
 import type { OrderInfo } from '@/types/order'
 import { onLoad } from '@dcloudio/uni-app'
@@ -16,6 +18,8 @@ const errorMsg = ref('')
 const isNavigating = ref(false)
 const currentOrderId = ref('')
 const isLeader = ref(false)
+const productDetail = ref<ProductItem | null>(null)
+const priceLabel = ref('')
 
 onLoad((query) => {
   const id = String(query?.id || '')
@@ -85,11 +89,27 @@ async function loadOrderDetail(id: string) {
   errorMsg.value = ''
   found.value = false
   orderInfo.value = null
+  productDetail.value = null
+  priceLabel.value = ''
 
   try {
     const target = await fetchOrderDetail(id)
     if (!target) return
     orderInfo.value = target
+    const productId = Number(target?.id)
+    if (Number.isFinite(productId) && productId > 0) {
+      try {
+        const detail = await getProductDetail(productId)
+        productDetail.value = detail || null
+        if (detail) {
+          const groupPrice = detail.groupPrice2 ?? detail.groupPrice3 ?? detail.price
+          const match = Math.abs(groupPrice - Number(target?.price || 0)) < 0.01
+          priceLabel.value = match ? '团购价' : '单买价'
+        }
+      } catch (error) {
+        productDetail.value = null
+      }
+    }
     found.value = true
   } catch (error: any) {
     const code = Number(error?.code)
@@ -171,7 +191,12 @@ function buyAgain() {
         >自提点地址：{{ orderInfo?.pickPointAddress || '-' }}</text
       >
       <text class="text-sm text-gray-600">数量：{{ orderInfo?.qty }}</text>
-      <text class="text-sm text-gray-600">实付：￥{{ orderInfo?.price }}</text>
+      <text class="text-sm text-gray-600">
+        实付：￥{{ orderInfo?.price }}
+        <text v-if="priceLabel" class="text-xs text-gray-400 ml-1"
+          >({{ priceLabel }})</text
+        >
+      </text>
       <text class="text-sm text-gray-600"
         >下单时间：{{ displayCreateTime }}</text
       >
