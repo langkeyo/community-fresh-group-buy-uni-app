@@ -7,12 +7,18 @@ import type { ProductItem } from '@/types/product'
 
 const goodsList = ref<ProductItem[]>([])
 
-const categories = ['全部']
-const sortList = ['默认']
-const activeCategory = ref('全部')
+const sortList = ['默认', '价格', '库存']
+const activeCategory = ref('all')
 const activeSort = ref('默认')
 const keyword = ref('')
 const loading = ref(false)
+
+const CATEGORY_LABEL: Record<string, string> = {
+  vegetable: '蔬菜',
+  fruit: '水果',
+  meat: '肉类',
+  seafood: '海鲜'
+}
 
 async function fetchGoods() {
   loading.value = true
@@ -28,20 +34,32 @@ async function fetchGoods() {
 const filteredGoods = computed(() => {
   let list = goodsList.value
 
+  if (activeCategory.value !== 'all') {
+    list = list.filter((item) => item.category === activeCategory.value)
+  }
+
   if (keyword.value.trim()) {
     list = list.filter((item) => item.name.includes(keyword.value.trim()))
+  }
+
+  if (activeSort.value === '价格') {
+    list = [...list].sort((a, b) => a.price - b.price)
+  } else if (activeSort.value === '库存') {
+    list = [...list].sort((a, b) => b.stock - a.stock)
   }
 
   return list
 })
 
 const viewGoods = computed(() => {
-  // price/sales 为占位展示，不参与筛选或业务计算
   return filteredGoods.value.map((item) => ({
     ...item,
-    price: '--',
-    originalPrice: '',
-    sales: '-'
+    categoryLabel: CATEGORY_LABEL[item.category] || item.category || '未分类',
+    groupPriceDisplay: (
+      item.groupPrice2 ?? item.groupPrice3 ?? item.price
+    ).toFixed(2),
+    originPriceDisplay: item.price.toFixed(2),
+    cover: item.images[0] || ''
   }))
 })
 
@@ -83,10 +101,15 @@ onMounted(() => {
     <!-- 分类栏 -->
     <view class="flex gap-2">
       <BaseButton
-        v-for="item in categories"
+        :type="activeCategory === 'all' ? 'primary' : 'default'"
+        text="全部"
+        @click="activeCategory = 'all'"
+      />
+      <BaseButton
+        v-for="item in Array.from(new Set(goodsList.map((g) => g.category))).filter(Boolean)"
         :key="item"
         :type="item === activeCategory ? 'primary' : 'default'"
-        :text="item"
+        :text="CATEGORY_LABEL[item] || item"
         @click="activeCategory = item"
       />
     </view>
@@ -110,7 +133,13 @@ onMounted(() => {
         @click="goToGroupBuy(item.id)"
       >
         <view class="flex gap-3">
-          <view class="w-20 h-20 bg-secondary rounded-md"></view>
+          <image
+            v-if="item.cover"
+            :src="item.cover"
+            mode="aspectFill"
+            class="w-20 h-20 bg-secondary rounded-md"
+          />
+          <view v-else class="w-20 h-20 bg-secondary rounded-md"></view>
           <view class="flex-1">
             <text class="block text-base font-bold text-fresh">{{
               item.name
@@ -118,20 +147,15 @@ onMounted(() => {
             <text class="block text-xs text-gray-500 mt-1"
               >商品编号：{{ item.id }}</text
             >
-            <view class="mt-2">
-              <text
-                v-if="item.price === '--'"
-                class="text-xs text-gray-400"
-              >
-                价格待完善
+            <view class="mt-2 flex items-center gap-2">
+              <text class="text-xs text-primary">团购价</text>
+              <text class="text-base font-bold text-primary">
+                ￥{{ item.groupPriceDisplay }}
               </text>
-              <view v-else class="flex items-center gap-2 text-gray-400">
-                <text class="text-xs">￥</text>
-                <text class="text-sm">{{ item.price }}</text>
-                <text v-if="item.originalPrice" class="text-xs line-through"
-                  >￥{{ item.originalPrice }}</text
-                >
-              </view>
+              <text class="text-xs text-gray-400 line-through"
+                >￥{{ item.originPriceDisplay }}</text
+              >
+              <text class="text-xs text-gray-400">库存 {{ item.stock }}</text>
             </view>
           </view>
         </view>

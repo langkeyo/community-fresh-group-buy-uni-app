@@ -4,9 +4,10 @@ import BaseField from '@/components/base/BaseField.vue'
 import { createOrder } from '@/services/order'
 import { getPickPointDetail } from '@/services/pick-point'
 import { getProductDetail } from '@/services/product'
+import type { ProductItem } from '@/types/product'
 import { useUserStore } from '@/stores/user'
 import { onLoad } from '@dcloudio/uni-app'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 const userStore = useUserStore()
 const ORDER_REFRESH_FLAG = 'order_need_refresh'
@@ -21,6 +22,25 @@ const formData = ref({
 const productId = ref<number | null>(null)
 const pickPointId = ref<number | null>(null)
 const productName = ref('商品')
+const productDetail = ref<ProductItem | null>(null)
+
+const displayPrice = computed(() => {
+  if (!productDetail.value) return '--'
+  const groupPrice =
+    formData.value.groupType === 2
+      ? productDetail.value.groupPrice2 ?? productDetail.value.price
+      : productDetail.value.groupPrice3 ?? productDetail.value.price
+  return groupPrice.toFixed(2)
+})
+
+const displayOriginPrice = computed(() => {
+  if (!productDetail.value) return '--'
+  return productDetail.value.price.toFixed(2)
+})
+
+const coverImage = computed(() => {
+  return productDetail.value?.images?.[0] || ''
+})
 
 function validateForm() {
   if (!formData.value.receiverName.trim()) {
@@ -58,10 +78,14 @@ async function submitGroupBuy(
   pickPointId: number
 ) {
   // 价格为占位展示，不参与业务计算（后端暂无真实价格字段）
+  const groupPrice =
+    formData.value.groupType === 2
+      ? productDetail.value?.groupPrice2 ?? productDetail.value?.price ?? 0
+      : productDetail.value?.groupPrice3 ?? productDetail.value?.price ?? 0
   const payload = {
     userId: userStore.userId,
     productId: productId,
-    totalPrice: 0,
+    totalPrice: groupPrice,
     pickPointId: pickPointId,
     groupBuyId: action === 'join' ? 'TEMP_GROUP_001' : null
   }
@@ -138,6 +162,7 @@ onLoad(async (query) => {
   if (productId.value) {
     try {
       const info = await getProductDetail(productId.value)
+      productDetail.value = info || null
       productName.value = info?.name || `商品#${productId.value}`
     } catch (error: any) {
       uni.showToast({ title: error?.message || '商品信息加载失败', icon: 'none' })
@@ -163,11 +188,20 @@ onLoad(async (query) => {
 
     <!-- 商品信息区 -->
     <view class="p-4 space-y-2 bg-white rounded-lg shadow-sm">
-      <view class="w-full h-32 rounded-md bg-secondary"></view>
+      <image
+        v-if="coverImage"
+        :src="coverImage"
+        mode="aspectFill"
+        class="w-full h-32 rounded-md bg-secondary"
+      />
+      <view v-else class="w-full h-32 rounded-md bg-secondary"></view>
       <text class="text-base font-bold text-fresh">{{ productName }}</text>
       <view class="flex items-center gap-2">
         <text class="text-xs text-primary">￥</text>
-        <text class="text-sm text-gray-400">--</text>
+        <text class="text-lg font-bold text-primary">{{ displayPrice }}</text>
+        <text class="text-xs text-gray-400 line-through"
+          >￥{{ displayOriginPrice }}</text
+        >
       </view>
     </view>
 
