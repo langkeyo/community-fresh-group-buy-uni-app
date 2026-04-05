@@ -2,7 +2,7 @@
 import BaseButton from '@/components/base/BaseButton.vue'
 import { getProductDetail } from '@/services/product'
 import type { ProductItem } from '@/types/product'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onPullDownRefresh } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 
 const loading = ref(true)
@@ -21,8 +21,8 @@ const displayOriginPrice = computed(() => {
   return product.value.price.toFixed(2)
 })
 
-const coverImage = computed(() => {
-  return product.value?.images?.[0] || ''
+const imageList = computed(() => {
+  return product.value?.images?.filter(Boolean) || []
 })
 
 const goToGroupBuy = () => {
@@ -64,6 +64,14 @@ onLoad((query) => {
   }
   load(id)
 })
+
+onPullDownRefresh(async () => {
+  const id = product.value?.id
+  if (id) {
+    await load(id)
+  }
+  uni.stopPullDownRefresh()
+})
 </script>
 
 <template>
@@ -77,12 +85,18 @@ onLoad((query) => {
     </view>
 
     <view v-else class="space-y-4">
-      <image
-        v-if="coverImage"
-        :src="coverImage"
-        mode="aspectFill"
+      <swiper
+        v-if="imageList.length"
         class="w-full h-56 bg-gray-200"
-      />
+        indicator-dots
+        circular
+        autoplay
+        interval="3000"
+      >
+        <swiper-item v-for="img in imageList" :key="img">
+          <image :src="img" mode="aspectFill" class="w-full h-56" />
+        </swiper-item>
+      </swiper>
       <view v-else class="w-full h-56 bg-gray-200"></view>
 
       <view class="px-4 space-y-2">
@@ -98,6 +112,11 @@ onLoad((query) => {
         </view>
         <text class="text-xs text-gray-500">
           库存：{{ product?.stock }}
+          <text
+            v-if="(product?.stock ?? 0) <= 10"
+            class="text-red-400 ml-1"
+            >库存紧张</text
+          >
         </text>
       </view>
 

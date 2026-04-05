@@ -4,7 +4,7 @@ import { getPickPointDetail } from '@/services/pick-point'
 import { getLeaderOrderList, leaderConfirmPick } from '@/services/order'
 import type { OrderInfo } from '@/types/order'
 import type { UserInfo } from '@/types/user'
-import { onShow } from '@dcloudio/uni-app'
+import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 
 const userInfo = ref<UserInfo | null>(null)
@@ -85,6 +85,18 @@ onShow(async () => {
   await loadPickPoint()
   if (!pickPointId.value) return
   await loadLeaderOrders()
+})
+
+onPullDownRefresh(async () => {
+  if (!userInfo.value?.isLeader) {
+    uni.stopPullDownRefresh()
+    return
+  }
+  await loadPickPoint()
+  if (pickPointId.value) {
+    await loadLeaderOrders()
+  }
+  uni.stopPullDownRefresh()
 })
 </script>
 

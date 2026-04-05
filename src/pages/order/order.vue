@@ -5,7 +5,7 @@ import { ORDER_STATUS_FALLBACK, ORDER_STATUS_MAP } from '@/constants/order-statu
 import { getOrderList } from '@/services/order'
 import { useUserStore } from '@/stores/user'
 import type { OrderInfo } from '@/types/order'
-import { onShow } from '@dcloudio/uni-app'
+import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 
 const statusList = [
@@ -89,6 +89,11 @@ onShow(() => {
   }
 
   loadOrderList()
+})
+
+onPullDownRefresh(async () => {
+  await loadOrderList()
+  uni.stopPullDownRefresh()
 })
 </script>
 

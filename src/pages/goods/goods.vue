@@ -4,6 +4,7 @@ import BaseCard from '@/components/base/BaseCard.vue'
 import { computed, onMounted, ref } from 'vue'
 import { getProductList } from '@/services/product'
 import type { ProductItem } from '@/types/product'
+import { onPullDownRefresh } from '@dcloudio/uni-app'
 
 const goodsList = ref<ProductItem[]>([])
 
@@ -81,6 +82,11 @@ function goToGroupBuy(id: string | number) {
 
 onMounted(() => {
   fetchGoods()
+})
+
+onPullDownRefresh(async () => {
+  await fetchGoods()
+  uni.stopPullDownRefresh()
 })
 </script>
 
