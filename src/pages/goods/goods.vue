@@ -89,7 +89,7 @@ onMounted(() => {
         type="text"
         v-model="keyword"
         placeholder="搜索商品/关键词..."
-        class="flex-1 text-base px-2 py-1"
+        class="flex-1 text-base px-3 py-2"
       />
     </view>
 

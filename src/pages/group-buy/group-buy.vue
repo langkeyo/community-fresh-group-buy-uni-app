@@ -197,7 +197,7 @@ onLoad((query) => {
           v-model="formData.receiverName"
           type="text"
           placeholder="收件人姓名"
-          class="w-full text-base py-1 px-1"
+          class="w-full text-base py-2 px-2"
         />
       </BaseField>
 
@@ -209,7 +209,7 @@ onLoad((query) => {
           type="number"
           :maxlength="11"
           placeholder="手机号"
-          class="w-full text-base py-1 px-1"
+          class="w-full text-base py-2 px-2"
         />
       </BaseField>
 

@@ -79,14 +79,14 @@ const callPhone = (phone: string) => {
   <view class="min-h-screen bg-[#F8F8F8]">
     <!-- 搜索栏 -->
     <view class="bg-white p-3 sticky top-0 border-b border-gray-100 z-10">
-      <view class="bg-[#F8F8F8] rounded-full flex items-center px-3 h-9">
+      <view class="bg-[#F8F8F8] rounded-full flex items-center px-3 h-10">
         <text class="text-gray-400 mr-2">🔍</text>
         <input
           v-model="keyword"
           type="text"
           placeholder="搜索附近自提点/小区"
           placeholder-class="text-gray-400 text-sm"
-          class="flex-1 text-sm text-[#2F5233] px-2 py-1"
+          class="flex-1 text-sm text-[#2F5233] px-3 py-2"
         />
       </view>
     </view>
