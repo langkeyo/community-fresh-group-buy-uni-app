@@ -86,7 +86,7 @@ const callPhone = (phone: string) => {
           type="text"
           placeholder="搜索附近自提点/小区"
           placeholder-class="text-gray-400 text-sm"
-          class="flex-1 text-sm text-[#2F5233]"
+          class="flex-1 text-sm text-[#2F5233] px-2 py-1"
         />
       </view>
     </view>
