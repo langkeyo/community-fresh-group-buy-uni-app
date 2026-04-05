@@ -96,7 +96,7 @@ async function loadOrderDetail(id: string) {
     const target = await fetchOrderDetail(id)
     if (!target) return
     orderInfo.value = target
-    const productId = Number(target?.id)
+    const productId = Number(target?.productId)
     if (Number.isFinite(productId) && productId > 0) {
       try {
         const detail = await getProductDetail(productId)

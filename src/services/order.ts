@@ -21,6 +21,7 @@ function mapBackendOrderToOrderInfo(item: BackendOrderItem): OrderInfo {
   return {
     id: item.id,
     no: item.no,
+    productId: (item as any).productId,
     name: item.name,
     qty: item.qty,
     price: item.price,
