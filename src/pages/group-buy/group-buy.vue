@@ -110,6 +110,10 @@ function resetForm() {
 async function handleSubmitGroupBuy(action: 'start' | 'join') {
   if (isSubmitting.value) return
   if (!validateForm()) return
+  if (productDetail.value?.stock !== undefined && productDetail.value.stock <= 0) {
+    uni.showToast({ title: '库存不足，请稍后再试', icon: 'none' })
+    return
+  }
 
   if (productId.value === null) {
     uni.showToast({ title: '商品信息缺失，请返回重试', icon: 'none' })
@@ -282,7 +286,7 @@ onLoad(async (query) => {
       <BaseButton
         class="flex-1"
         :loading="isSubmitting && currentAction === 'start'"
-        :disabled="isSubmitting"
+        :disabled="isSubmitting || (productDetail?.stock ?? 0) <= 0"
         text="发起拼团"
         @click="handleSubmitGroupBuy('start')"
       />
@@ -290,10 +294,17 @@ onLoad(async (query) => {
         class="flex-1"
         type="default"
         :loading="isSubmitting && currentAction === 'join'"
-        :disabled="isSubmitting"
+        :disabled="isSubmitting || (productDetail?.stock ?? 0) <= 0"
         text="加入拼团"
         @click="handleSubmitGroupBuy('join')"
       />
+    </view>
+
+    <view
+      v-if="productDetail?.stock !== undefined && productDetail.stock <= 0"
+      class="text-xs text-red-500 text-center"
+    >
+      库存不足，暂不可下单
     </view>
 
     <!-- 成团提示 -->
