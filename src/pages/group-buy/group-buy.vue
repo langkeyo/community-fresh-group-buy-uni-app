@@ -304,16 +304,16 @@ onLoad(async (query) => {
       class="fixed left-0 right-0 bottom-0 bg-white border-t border-gray-100 px-4 pt-3"
       style="padding-bottom: calc(env(safe-area-inset-bottom) + 12rpx);"
     >
-      <view class="flex gap-3">
+      <view class="flex flex-col gap-2">
         <BaseButton
-          class="flex-1"
+          class="w-full"
           :loading="isSubmitting && currentAction === 'start'"
           :disabled="isSubmitting || (productDetail?.stock ?? 0) <= 0"
           text="发起拼团"
           @click="handleSubmitGroupBuy('start')"
         />
         <BaseButton
-          class="flex-1"
+          class="w-full"
           type="default"
           :loading="isSubmitting && currentAction === 'join'"
           :disabled="isSubmitting || (productDetail?.stock ?? 0) <= 0"
