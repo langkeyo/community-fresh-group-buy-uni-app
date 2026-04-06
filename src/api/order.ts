@@ -53,6 +53,13 @@ export interface OpenGroupItem {
   latestCreateTime: string
 }
 
+export interface LeaderWorkbenchResp {
+  pendingCount: number
+  pickedTodayCount: number
+  pendingOrders: BackendOrderItem[]
+  recentPickedOrders: BackendOrderItem[]
+}
+
 export const getLeaderOrderListApi = (
   leaderId: number,
   pickPointId: number,
@@ -71,6 +78,12 @@ export const leaderConfirmPickApi = (
   return http.put<Result<string>>(
     `/api/order/leader/confirm/${orderId}?leaderId=${leaderId}&pickPointId=${pickPointId}`
   ) as unknown as Promise<Result<string>>
+}
+
+export const getLeaderWorkbenchApi = (leaderId: number, pickPointId: number) => {
+  return http.get<Result<LeaderWorkbenchResp>>('/api/order/leader/workbench', {
+    params: { leaderId, pickPointId }
+  }) as unknown as Promise<Result<LeaderWorkbenchResp>>
 }
 
 export const getOpenGroupListApi = (

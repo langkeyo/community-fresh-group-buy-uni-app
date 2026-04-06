@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { login, getUserInfo } from '@/api/user' // 引入咱们封装好的接口
+import { getLeaderWorkbench } from '@/services/order'
 import type { UserInfo } from '@/types/user' // 引入类型定义
 import { onShow } from '@dcloudio/uni-app' // 生命周期钩子
 
 // --- 状态定义 ---
 const isLogin = ref(false)
 const userInfo = ref<UserInfo | null>(null)
+const leaderSummaryText = ref('进入工作台查看待核销订单')
 
 // 默认的工具栏数据
 const tools = [
@@ -38,9 +40,11 @@ const checkLoginStatus = () => {
     }
     // 悄悄在后台更新一下最新用户信息
     fetchUserInfo()
+    loadLeaderSummary()
   } else {
     isLogin.value = false
     userInfo.value = null
+    leaderSummaryText.value = '登录后可查看团长工作台'
   }
 }
 
@@ -72,6 +76,27 @@ const fetchUserInfo = async () => {
 const updateLocalUser = (user: UserInfo) => {
   userInfo.value = user
   uni.setStorageSync('userInfo', user)
+  loadLeaderSummary()
+}
+
+const loadLeaderSummary = async () => {
+  if (!isLogin.value || !userInfo.value?.isLeader || !userInfo.value?.id) {
+    leaderSummaryText.value = '进入工作台查看待核销订单'
+    return
+  }
+
+  const pickPointId = Number(uni.getStorageSync('default_pick_point_id'))
+  if (!pickPointId) {
+    leaderSummaryText.value = '请先选择默认自提点'
+    return
+  }
+
+  try {
+    const data = await getLeaderWorkbench(userInfo.value.id, pickPointId)
+    leaderSummaryText.value = `今日核销 ${data.pickedTodayCount} | 待核销 ${data.pendingCount}`
+  } catch (error: any) {
+    leaderSummaryText.value = '工作台数据加载失败，点击重试'
+  }
 }
 
 // --- 页面跳转逻辑 ---
@@ -204,7 +229,7 @@ const handleToolClick = (route: string) => {
           </view>
           <view>
             <text class="font-bold text-lg block">团长工作台</text>
-            <text class="text-xs opacity-80">今日订单 12 | 待核销 3</text>
+            <text class="text-xs opacity-80">{{ leaderSummaryText }}</text>
           </view>
         </view>
         <uni-icons type="right" size="16" color="#ffffff"></uni-icons>

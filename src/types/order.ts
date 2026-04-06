@@ -12,3 +12,10 @@ export interface OrderInfo {
   status: OrderStatus
   createTime: string
 }
+
+export interface LeaderWorkbench {
+  pendingCount: number
+  pickedTodayCount: number
+  pendingOrders: OrderInfo[]
+  recentPickedOrders: OrderInfo[]
+}

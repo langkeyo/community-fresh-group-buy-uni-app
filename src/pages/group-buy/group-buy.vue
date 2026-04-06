@@ -400,11 +400,11 @@ onLoad(async (query) => {
       库存不足，暂不可下单
     </view>
 
-    <!-- 成团提示 -->
+    <!-- 支付说明 -->
     <view
       class="bg-[#FFF7E6] border border-primary/30 text-primary rounded-lg p-3 text-sm"
     >
-      🎉 已成团！请前往订单页查看取货信息
+      当前为毕业设计演示环境：支付流程为模拟链路，订单与核销流程为真实联调数据。
     </view>
     <view
       class="fixed left-0 right-0 bottom-0 bg-white border-t border-gray-100 px-4 pt-3"

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import BaseButton from '@/components/base/BaseButton.vue'
 import { getPickPointDetail } from '@/services/pick-point'
-import { getLeaderOrderList, leaderConfirmPick } from '@/services/order'
+import { getLeaderWorkbench, leaderConfirmPick } from '@/services/order'
 import type { OrderInfo } from '@/types/order'
 import type { UserInfo } from '@/types/user'
 import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
@@ -13,8 +13,10 @@ const pickPointAddress = ref('')
 const pickPointId = ref<number | null>(null)
 const loading = ref(false)
 const errorMsg = ref('')
+const confirmingId = ref('')
 const pendingOrders = ref<OrderInfo[]>([])
 const recentConfirmList = ref<OrderInfo[]>([])
+const pickedTodayCount = ref(0)
 
 const pendingCount = computed(() => pendingOrders.value.length)
 
@@ -48,32 +50,32 @@ const loadLeaderOrders = async () => {
   loading.value = true
   errorMsg.value = ''
   try {
-    pendingOrders.value = await getLeaderOrderList(
-      userInfo.value.id,
-      pickPointId.value,
-      2
-    )
+    const data = await getLeaderWorkbench(userInfo.value.id, pickPointId.value)
+    pendingOrders.value = data.pendingOrders
+    recentConfirmList.value = data.recentPickedOrders
+    pickedTodayCount.value = data.pickedTodayCount
   } catch (error: any) {
     errorMsg.value = error?.message || '待核销订单加载失败'
     pendingOrders.value = []
+    recentConfirmList.value = []
+    pickedTodayCount.value = 0
   } finally {
     loading.value = false
   }
 }
 
 const handleConfirm = async (id: string) => {
-  if (!userInfo.value?.id || !pickPointId.value) return
+  if (!userInfo.value?.id || !pickPointId.value || confirmingId.value) return
+  confirmingId.value = id
   try {
     await leaderConfirmPick(id, userInfo.value.id, pickPointId.value)
     uni.showToast({ title: '核销成功', icon: 'success' })
     uni.setStorageSync('order_need_refresh', true)
-    const target = pendingOrders.value.find((item) => item.id === id)
-    if (target) {
-      recentConfirmList.value = [target, ...recentConfirmList.value].slice(0, 5)
-    }
     await loadLeaderOrders()
   } catch (error: any) {
     uni.showToast({ title: error?.message || '核销失败', icon: 'none' })
+  } finally {
+    confirmingId.value = ''
   }
 }
 
@@ -130,8 +132,8 @@ onPullDownRefresh(async () => {
           <text class="text-xs opacity-80">待核销订单</text>
         </view>
         <view class="flex flex-col items-end">
-          <text class="text-xl font-bold">团长</text>
-          <text class="text-xs opacity-80">身份已认证</text>
+          <text class="text-xl font-bold">{{ pickedTodayCount }}</text>
+          <text class="text-xs opacity-80">今日已核销</text>
         </view>
       </view>
     </view>
@@ -161,7 +163,8 @@ onPullDownRefresh(async () => {
       </view>
 
       <view v-else-if="errorMsg" class="py-4 text-center">
-        <text class="text-xs text-red-500">{{ errorMsg }}</text>
+        <text class="text-xs text-red-500 block mb-2">{{ errorMsg }}</text>
+        <BaseButton type="default" text="重试加载" @click="loadLeaderOrders" />
       </view>
 
       <view v-else>
@@ -180,7 +183,12 @@ onPullDownRefresh(async () => {
             }}</text>
           </view>
           <view class="flex justify-end">
-            <BaseButton text="确认提货" @click="handleConfirm(item.id)" />
+            <BaseButton
+              text="确认提货"
+              :loading="confirmingId === item.id"
+              :disabled="Boolean(confirmingId) && confirmingId !== item.id"
+              @click="handleConfirm(item.id)"
+            />
           </view>
         </view>
       </view>

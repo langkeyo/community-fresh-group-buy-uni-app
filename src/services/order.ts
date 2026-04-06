@@ -1,5 +1,6 @@
 import {
   createOrderApi,
+  getLeaderWorkbenchApi,
   getOpenGroupListApi,
   getOrderDetailApi,
   getOrderListApi,
@@ -9,10 +10,11 @@ import {
   type BackendOrderItem,
   type CreateOrderReq
   ,
+  type LeaderWorkbenchResp,
   type OpenGroupItem
 } from '@/api/order'
-import { backendOrderItemSchema, backendOrderListSchema } from '@/schemas/order'
-import type { OrderInfo } from '@/types/order'
+import { backendOrderItemSchema, backendOrderListSchema, leaderWorkbenchSchema } from '@/schemas/order'
+import type { LeaderWorkbench, OrderInfo } from '@/types/order'
 
 function normalizeOrderStatus(status: number): OrderInfo['status'] {
   if (status === 1 || status === 2 || status === 3 || status === -1)
@@ -113,4 +115,30 @@ export async function getOpenGroupList(
 ): Promise<OpenGroupItem[]> {
   const res = await getOpenGroupListApi(productId, pickPointId)
   return res.data ?? []
+}
+
+function mapLeaderWorkbench(resp: LeaderWorkbenchResp): LeaderWorkbench {
+  const parsed = leaderWorkbenchSchema.safeParse(resp)
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0]
+    throw new Error(
+      `团长工作台数据格式异常: ${issue?.path?.join('.') || 'unknown'}`
+    )
+  }
+  return {
+    pendingCount: parsed.data.pendingCount,
+    pickedTodayCount: parsed.data.pickedTodayCount,
+    pendingOrders: parsed.data.pendingOrders.map(mapBackendOrderToOrderInfo),
+    recentPickedOrders: parsed.data.recentPickedOrders.map(
+      mapBackendOrderToOrderInfo
+    )
+  }
+}
+
+export async function getLeaderWorkbench(
+  leaderId: number,
+  pickPointId: number
+): Promise<LeaderWorkbench> {
+  const res = await getLeaderWorkbenchApi(leaderId, pickPointId)
+  return mapLeaderWorkbench(res.data ?? ({} as LeaderWorkbenchResp))
 }

@@ -15,4 +15,11 @@ export const backendOrderItemSchema = z.object({
 
 export const backendOrderListSchema = z.array(backendOrderItemSchema)
 
+export const leaderWorkbenchSchema = z.object({
+  pendingCount: z.coerce.number().default(0),
+  pickedTodayCount: z.coerce.number().default(0),
+  pendingOrders: z.array(backendOrderItemSchema).default([]),
+  recentPickedOrders: z.array(backendOrderItemSchema).default([])
+})
+
 export type BackendOrderItemSchema = z.infer<typeof backendOrderItemSchema>
