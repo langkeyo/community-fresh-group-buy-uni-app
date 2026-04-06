@@ -25,12 +25,15 @@ export async function getAiRecipeRecommend(
   }
 
   return {
-    id: Date.now(),
+    id: Date.now() + Math.floor(Math.random() * 1000),
     title: data.recipe.title || '未命名菜谱',
     desc: data.recipe.desc || '暂无描述',
     tags: data.recipe.tags || [],
-    image: data.recipe.image || '',
-    steps: data.recipe.steps || [],
+    image: data.recipe.image || 'https://loremflickr.com/500/300/food?lock=501',
+    steps: (data.recipe.steps || []).map((step, index) => ({
+      step: Number(step.step) || index + 1,
+      content: step.content || ''
+    })),
     source: data.source,
     disclaimer: data.disclaimer || ''
   }

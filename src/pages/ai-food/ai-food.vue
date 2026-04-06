@@ -40,7 +40,7 @@ const saveFavorites = () => {
 }
 
 // 发送请求
-const handleSend = () => {
+const handleSend = async () => {
   if (!inputValue.value.trim() || isThinking.value) return
 
   const query = inputValue.value.trim()
@@ -52,19 +52,16 @@ const handleSend = () => {
   // 滚动到底部
   scrollToBottom()
 
-  // 模拟 AI 思考延迟
-  setTimeout(async () => {
-    try {
-      await generateResponse(query)
-      scrollToBottom()
-    } catch (error) {
-      const msg = resolveErrorMessage(error)
-      errorTip.value = msg
-      uni.showToast({ title: msg, icon: 'none' })
-    } finally {
-      isThinking.value = false
-    }
-  }, 1500)
+  try {
+    await generateResponse(query)
+    scrollToBottom()
+  } catch (error) {
+    const msg = resolveErrorMessage(error)
+    errorTip.value = msg
+    uni.showToast({ title: msg, icon: 'none' })
+  } finally {
+    isThinking.value = false
+  }
 }
 
 // 生成回复逻辑
@@ -124,16 +121,24 @@ const resolveErrorMessage = (error: any) => {
   if (raw === 'EMPTY_RESULT') {
     return '暂无可用结果，换个说法试试'
   }
-  if (raw.includes('timeout') || raw.includes('超时')) {
+  if (
+    raw.includes('timeout') ||
+    raw.includes('超时') ||
+    raw.includes('NETWORK_ERROR') ||
+    raw.includes('网络请求异常')
+  ) {
     return 'AI响应超时，请稍后重试'
+  }
+  if (raw.includes('500') || raw.includes('服务器')) {
+    return 'AI服务暂时繁忙，请稍后再试'
   }
   return '推荐失败，请稍后重试'
 }
 
-const retryLast = () => {
+const retryLast = async () => {
   if (!lastQuery.value || isThinking.value) return
   inputValue.value = lastQuery.value
-  handleSend()
+  await handleSend()
 }
 
 loadFavorites()
@@ -316,22 +321,24 @@ loadFavorites()
     <view
       class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-3 pb-safe z-50"
     >
-      <view class="flex items-center bg-[#F8F8F8] rounded-full px-3 py-2">
-        <input
-          v-model="inputValue"
-          type="text"
-          confirm-type="send"
-          placeholder="输入食材或菜名（如：番茄）"
-          placeholder-class="text-gray-400 text-sm"
-          class="flex-1 text-sm text-[#2F5233] base-input"
-          @confirm="handleSend"
-        />
-        <view
-          class="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
-          :class="inputValue.trim() ? 'bg-[#F08800]' : 'bg-gray-300'"
-          @click="handleSend"
-        >
-          <text class="text-white text-sm font-bold">↑</text>
+      <view class="bg-[#F8F8F8] rounded-full p-1">
+        <view class="flex items-center px-3 py-1">
+          <input
+            v-model="inputValue"
+            type="text"
+            confirm-type="send"
+            placeholder="输入食材或菜名（如：番茄）"
+            placeholder-class="text-gray-400 text-sm"
+            class="flex-1 ml-1 text-sm text-[#2F5233] h-9"
+            @confirm="handleSend"
+          />
+          <view
+            class="h-9 px-4 rounded-full flex items-center justify-center transition-colors"
+            :class="inputValue.trim() ? 'bg-[#F08800]' : 'bg-gray-300'"
+            @click="handleSend"
+          >
+            <text class="text-white text-sm font-bold">发送</text>
+          </view>
         </view>
       </view>
     </view>
