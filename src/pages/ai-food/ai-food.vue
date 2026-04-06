@@ -5,14 +5,27 @@ import { getAiRecipeRecommend } from '@/services/ai'
 import type { AiRecipeHistoryItem, FavoriteItem } from '@/types/ai'
 import { ref } from 'vue'
 
+interface ChatCard extends AiRecipeHistoryItem {
+  query: string
+}
+
 // --- 响应式数据 ---
 const inputValue = ref('')
 const isThinking = ref(false) // AI 是否正在思考
-const chatHistory = ref<AiRecipeHistoryItem[]>([]) // 生成的食谱历史
+const chatHistory = ref<ChatCard[]>([]) // 生成的食谱历史
 const errorTip = ref('')
 const lastQuery = ref('')
+const pendingQuery = ref('')
+const thinkingStage = ref('正在理解你的需求...')
 const FAVORITE_KEY = 'ai_favorites'
 const favoriteMap = ref<Record<string, FavoriteItem>>({})
+const MIN_THINKING_MS = 900
+const THINKING_STAGE_LIST = [
+  '正在理解你的需求...',
+  '正在匹配可用食材...',
+  '正在生成做法步骤...'
+]
+let thinkingStageTimer: ReturnType<typeof setInterval> | null = null
 
 const getFavoriteKey = (item: FavoriteItem) => `${item.title}||${item.desc}`
 
@@ -39,28 +52,58 @@ const saveFavorites = () => {
   uni.setStorageSync(FAVORITE_KEY, JSON.stringify(list))
 }
 
+const sleep = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms))
+
+const startThinkingStageLoop = () => {
+  stopThinkingStageLoop()
+  let idx = 0
+  thinkingStage.value = THINKING_STAGE_LIST[idx]
+  thinkingStageTimer = setInterval(() => {
+    idx = (idx + 1) % THINKING_STAGE_LIST.length
+    thinkingStage.value = THINKING_STAGE_LIST[idx]
+  }, 900)
+}
+
+const stopThinkingStageLoop = () => {
+  if (!thinkingStageTimer) return
+  clearInterval(thinkingStageTimer)
+  thinkingStageTimer = null
+}
+
 // 发送请求
 const handleSend = async () => {
   if (!inputValue.value.trim() || isThinking.value) return
 
   const query = inputValue.value.trim()
   inputValue.value = '' // 清空输入框
+  pendingQuery.value = query
   isThinking.value = true
+  startThinkingStageLoop()
   errorTip.value = ''
   lastQuery.value = query
 
   // 滚动到底部
   scrollToBottom()
 
+  const startedAt = Date.now()
   try {
     await generateResponse(query)
+    pendingQuery.value = ''
     scrollToBottom()
   } catch (error) {
     const msg = resolveErrorMessage(error)
     errorTip.value = msg
+    pendingQuery.value = ''
     uni.showToast({ title: msg, icon: 'none' })
   } finally {
+    const elapsed = Date.now() - startedAt
+    if (elapsed < MIN_THINKING_MS) {
+      await sleep(MIN_THINKING_MS - elapsed)
+    }
+    stopThinkingStageLoop()
     isThinking.value = false
+    scrollToBottom()
   }
 }
 
@@ -70,6 +113,7 @@ const generateResponse = async (query: string) => {
   const favKey = getFavoriteKey(result)
   chatHistory.value.push({
     ...result,
+    query,
     isCollected: Boolean(favoriteMap.value[favKey]),
     timestamp: new Date().toLocaleTimeString('zh-CN', {
       hour: '2-digit',
@@ -79,7 +123,7 @@ const generateResponse = async (query: string) => {
 }
 
 // 收藏/取消收藏
-const toggleCollect = (card: AiRecipeHistoryItem) => {
+const toggleCollect = (card: ChatCard) => {
   card.isCollected = !card.isCollected
   const favKey = getFavoriteKey(card)
   if (card.isCollected) {
@@ -117,7 +161,9 @@ const handleTagClick = (text: string) => {
 }
 
 const resolveErrorMessage = (error: any) => {
-  const raw = error?.message || ''
+  const raw = String(
+    error?.message || error?.errMsg || error?.msg || JSON.stringify(error || {})
+  )
   if (raw === 'EMPTY_RESULT') {
     return '暂无可用结果，换个说法试试'
   }
@@ -148,7 +194,7 @@ loadFavorites()
   <view class="flex flex-col min-h-screen bg-[#F8F8F8] pb-[140rpx]">
     <!-- 1. 顶部欢迎语 (无历史记录时显示) -->
     <view
-      v-if="chatHistory.length === 0"
+      v-if="chatHistory.length === 0 && !pendingQuery"
       class="flex flex-col items-center justify-center pt-20 px-6"
     >
       <view
@@ -200,6 +246,14 @@ loadFavorites()
     <!-- 2. 对话列表 -->
     <view v-else class="p-4 space-y-6">
       <view v-for="card in chatHistory" :key="card.id" class="fade-in-up">
+        <view class="flex justify-end mb-3">
+          <view
+            class="max-w-[80%] bg-[#F08800] text-white text-sm px-4 py-2 rounded-2xl rounded-br-md"
+          >
+            {{ card.query }}
+          </view>
+        </view>
+
         <!-- AI 头像与时间 -->
         <view class="flex items-center mb-2 ml-1">
           <view
@@ -302,17 +356,38 @@ loadFavorites()
       </view>
 
       <!-- 思考中状态 -->
-      <view v-if="isThinking" class="flex items-center ml-1 fade-in">
+      <view v-if="pendingQuery" class="flex justify-end fade-in-up">
         <view
-          class="w-6 h-6 bg-[#F08800] rounded-full flex items-center justify-center mr-2"
+          class="max-w-[80%] bg-[#F08800] text-white text-sm px-4 py-2 rounded-2xl rounded-br-md"
         >
-          <text class="text-xs text-white">AI</text>
+          {{ pendingQuery }}
+        </view>
+      </view>
+      <view v-if="isThinking" class="fade-in">
+        <view class="flex items-center ml-1 mb-2">
+          <view
+            class="w-6 h-6 bg-[#F08800] rounded-full flex items-center justify-center mr-2"
+          >
+            <text class="text-xs text-white">AI</text>
+          </view>
+          <view
+            class="bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-100 flex items-center"
+          >
+            <view class="ai-thinking__spinner mr-2"></view>
+            <text class="text-sm text-gray-500">{{ thinkingStage }}</text>
+          </view>
         </view>
         <view
-          class="bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-100 flex items-center"
+          class="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 animate-pulse"
         >
-          <text class="text-sm text-gray-500 mr-2">正在分析食材成分...</text>
-          <text class="animate-pulse text-[#F08800]">●</text>
+          <view class="w-full h-40 bg-gray-200"></view>
+          <view class="p-4 space-y-3">
+            <view class="h-4 w-2/3 bg-gray-200 rounded"></view>
+            <view class="h-3 w-1/3 bg-gray-200 rounded"></view>
+            <view class="h-3 w-full bg-gray-100 rounded"></view>
+            <view class="h-3 w-5/6 bg-gray-100 rounded"></view>
+            <view class="h-20 w-full bg-gray-100 rounded-lg"></view>
+          </view>
         </view>
       </view>
     </view>
@@ -334,9 +409,16 @@ loadFavorites()
           />
           <view
             class="h-9 px-4 rounded-full flex items-center justify-center transition-colors"
-            :class="inputValue.trim() ? 'bg-[#F08800]' : 'bg-gray-300'"
+            :class="
+              isThinking
+                ? 'bg-[#F6B04A]'
+                : inputValue.trim()
+                  ? 'bg-[#F08800]'
+                  : 'bg-gray-300'
+            "
             @click="handleSend"
           >
+            <view v-if="isThinking" class="ai-send__spinner mr-1"></view>
             <text class="text-white text-sm font-bold">发送</text>
           </view>
         </view>
@@ -376,5 +458,30 @@ loadFavorites()
 /* 底部安全区适配 */
 .pb-safe {
   padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
+
+.ai-thinking__spinner,
+.ai-send__spinner {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 9999rpx;
+  border: 2rpx solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.ai-thinking__spinner {
+  border-color: rgba(240, 136, 0, 0.2);
+  border-top-color: #f08800;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

@@ -24,6 +24,9 @@ export const recommendAiApi = (query: string) => {
   return http.post<Result<AiRecommendResp>>(
     '/api/ai/recommend',
     {},
-    { params: { query } }
+    {
+      params: { query },
+      timeout: 45000
+    }
   ) as unknown as Promise<Result<AiRecommendResp>>
 }
