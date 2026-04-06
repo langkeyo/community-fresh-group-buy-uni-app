@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseField from '@/components/base/BaseField.vue'
-import { createOrder } from '@/services/order'
+import { createOrder, getOpenGroupList } from '@/services/order'
+import type { OpenGroupItem } from '@/api/order'
 import { getPickPointDetail } from '@/services/pick-point'
 import { getProductDetail } from '@/services/product'
 import type { ProductItem } from '@/types/product'
@@ -23,13 +24,16 @@ const productId = ref<number | null>(null)
 const pickPointId = ref<number | null>(null)
 const productName = ref('商品')
 const productDetail = ref<ProductItem | null>(null)
+const openGroups = ref<OpenGroupItem[]>([])
+const selectedGroupId = ref('')
+const loadingGroups = ref(false)
 
 const displayPrice = computed(() => {
   if (!productDetail.value) return '--'
   const groupPrice =
     formData.value.groupType === 2
-      ? productDetail.value.groupPrice2 ?? productDetail.value.price
-      : productDetail.value.groupPrice3 ?? productDetail.value.price
+      ? (productDetail.value.groupPrice2 ?? productDetail.value.price)
+      : (productDetail.value.groupPrice3 ?? productDetail.value.price)
   return groupPrice.toFixed(2)
 })
 
@@ -40,6 +44,26 @@ const displayOriginPrice = computed(() => {
 
 const coverImage = computed(() => {
   return productDetail.value?.images?.[0] || ''
+})
+
+const selectedOpenGroup = computed(() => {
+  return openGroups.value.find((x) => x.groupBuyId === selectedGroupId.value)
+})
+
+const progressCurrent = computed(() => {
+  return selectedOpenGroup.value?.currentCount || 1
+})
+
+const progressTarget = computed(() => {
+  return selectedOpenGroup.value?.targetCount || formData.value.groupType
+})
+
+const progressWidth = computed(() => {
+  const ratio = Math.max(
+    0,
+    Math.min(1, progressCurrent.value / Math.max(1, progressTarget.value))
+  )
+  return `${Math.round(ratio * 100)}%`
 })
 
 function validateForm() {
@@ -80,14 +104,21 @@ async function submitGroupBuy(
   // 价格为占位展示，不参与业务计算（后端暂无真实价格字段）
   const groupPrice =
     formData.value.groupType === 2
-      ? productDetail.value?.groupPrice2 ?? productDetail.value?.price ?? 0
-      : productDetail.value?.groupPrice3 ?? productDetail.value?.price ?? 0
+      ? (productDetail.value?.groupPrice2 ?? productDetail.value?.price ?? 0)
+      : (productDetail.value?.groupPrice3 ?? productDetail.value?.price ?? 0)
+  let groupBuyId: string | null = null
+  if (action === 'start') {
+    groupBuyId = `GB${formData.value.groupType}-${Date.now()}-${userStore.userId}`
+  } else {
+    groupBuyId = selectedGroupId.value || null
+  }
+
   const payload = {
     userId: userStore.userId,
     productId: productId,
     totalPrice: groupPrice,
     pickPointId: pickPointId,
-    groupBuyId: action === 'join' ? 'TEMP_GROUP_001' : null
+    groupBuyId
   }
 
   await createOrder(payload)
@@ -110,7 +141,10 @@ function resetForm() {
 async function handleSubmitGroupBuy(action: 'start' | 'join') {
   if (isSubmitting.value) return
   if (!validateForm()) return
-  if (productDetail.value?.stock !== undefined && productDetail.value.stock <= 0) {
+  if (
+    productDetail.value?.stock !== undefined &&
+    productDetail.value.stock <= 0
+  ) {
     uni.showToast({ title: '库存不足，请稍后再试', icon: 'none' })
     return
   }
@@ -122,6 +156,11 @@ async function handleSubmitGroupBuy(action: 'start' | 'join') {
 
   if (pickPointId.value === null) {
     uni.showToast({ title: '自提点信息缺失，请返回重试', icon: 'none' })
+    return
+  }
+
+  if (action === 'join' && !selectedGroupId.value) {
+    uni.showToast({ title: '请先选择可加入的拼团', icon: 'none' })
     return
   }
 
@@ -152,6 +191,33 @@ async function handleSubmitGroupBuy(action: 'start' | 'join') {
   }
 }
 
+function pickOpenGroup(item: OpenGroupItem) {
+  selectedGroupId.value = item.groupBuyId
+  formData.value.groupType = item.targetCount === 3 ? 3 : 2
+}
+
+async function loadOpenGroups() {
+  if (productId.value === null || pickPointId.value === null) {
+    openGroups.value = []
+    selectedGroupId.value = ''
+    return
+  }
+  loadingGroups.value = true
+  try {
+    const list = await getOpenGroupList(productId.value, pickPointId.value)
+    openGroups.value = list
+    if (!list.find((x) => x.groupBuyId === selectedGroupId.value)) {
+      selectedGroupId.value = ''
+    }
+  } catch (error: any) {
+    openGroups.value = []
+    selectedGroupId.value = ''
+    uni.showToast({ title: error?.message || '拼团列表加载失败', icon: 'none' })
+  } finally {
+    loadingGroups.value = false
+  }
+}
+
 onLoad(async (query) => {
   const id = Number(query?.id)
   productId.value = Number.isFinite(id) && id > 0 ? id : null
@@ -169,7 +235,10 @@ onLoad(async (query) => {
       productDetail.value = info || null
       productName.value = info?.name || `商品#${productId.value}`
     } catch (error: any) {
-      uni.showToast({ title: error?.message || '商品信息加载失败', icon: 'none' })
+      uni.showToast({
+        title: error?.message || '商品信息加载失败',
+        icon: 'none'
+      })
     }
   }
 
@@ -180,16 +249,21 @@ onLoad(async (query) => {
         formData.value.pickupPoint = `${point.name}（${point.address}）`
       }
     } catch (error: any) {
-      uni.showToast({ title: error?.message || '自提点信息加载失败', icon: 'none' })
+      uni.showToast({
+        title: error?.message || '自提点信息加载失败',
+        icon: 'none'
+      })
     }
   }
+
+  await loadOpenGroups()
 })
 </script>
 
 <template>
   <view
     class="min-h-screen px-4 pt-4 space-y-4 bg-gray-50"
-    style="padding-bottom: 140rpx;"
+    style="padding-bottom: 140rpx"
   >
     <text class="text-base font-bold text-fresh">拼团详情</text>
 
@@ -227,17 +301,49 @@ onLoad(async (query) => {
     <view class="p-4 space-y-2 bg-white rounded-lg shadow-sm">
       <text class="text-base font-bold text-fresh">拼团进度</text>
       <view class="flex items-center justify-between text-sm text-gray-600">
-        <text>已参与 1 人</text>
-        <text>目标 3 人</text>
+        <text>已参与 {{ progressCurrent }} 人</text>
+        <text>目标 {{ progressTarget }} 人</text>
       </view>
 
       <view class="h-2 overflow-hidden bg-gray-200 rounded-full">
-        <view class="w-1/3 h-full bg-primary"></view>
+        <view class="h-full bg-primary" :style="{ width: progressWidth }"></view>
+      </view>
+    </view>
+
+    <view class="p-4 space-y-2 bg-white rounded-lg shadow-sm">
+      <view class="flex items-center justify-between">
+        <text class="text-base font-bold text-fresh">可加入的拼团</text>
+        <text class="text-xs text-gray-400" @click="loadOpenGroups">刷新</text>
+      </view>
+      <view v-if="loadingGroups" class="py-2 text-center">
+        <text class="text-xs text-gray-400">加载中...</text>
+      </view>
+      <view v-else-if="!openGroups.length" class="py-2 text-center">
+        <text class="text-xs text-gray-400">暂无可加入拼团，可发起新团</text>
+      </view>
+      <view v-else class="space-y-2">
+        <view
+          v-for="item in openGroups"
+          :key="item.groupBuyId"
+          class="rounded-lg border p-3"
+          :class="
+            selectedGroupId === item.groupBuyId
+              ? 'border-primary bg-orange-50'
+              : 'border-gray-200 bg-white'
+          "
+          @click="pickOpenGroup(item)"
+        >
+          <view class="flex items-center justify-between">
+            <text class="text-sm text-fresh">拼团号：{{ item.groupBuyId.slice(0, 12) }}</text>
+            <text class="text-xs text-gray-500">{{ item.currentCount }}/{{ item.targetCount }} 人</text>
+          </view>
+          <text class="block text-xs text-gray-400 mt-1">最近下单：{{ item.latestCreateTime || '-' }}</text>
+        </view>
       </view>
     </view>
 
     <!-- 拼团表单 -->
-    <view class="p-4 space-y-3 bg-white rounded-lg shadow-sm">
+    <view class="flex flex-col p-4 gap-3 bg-white rounded-lg shadow-sm">
       <text class="text-base font-bold text-fresh">填写信息</text>
 
       <!-- 选择人数 -->
@@ -285,7 +391,7 @@ onLoad(async (query) => {
     </view>
 
     <!-- 占位：给底部固定按钮留出空间 -->
-    <view class="h-8"></view>
+    <!-- <view class="h-8"></view> -->
 
     <view
       v-if="productDetail?.stock !== undefined && productDetail.stock <= 0"
@@ -302,21 +408,24 @@ onLoad(async (query) => {
     </view>
     <view
       class="fixed left-0 right-0 bottom-0 bg-white border-t border-gray-100 px-4 pt-3"
-      style="padding-bottom: calc(env(safe-area-inset-bottom) + 12rpx);"
+      style="padding-bottom: calc(env(safe-area-inset-bottom) + 12rpx)"
     >
-      <view class="flex flex-col gap-2">
+      <view class="flex w-full items-center justify-between px-4">
         <BaseButton
-          class="w-full"
           :loading="isSubmitting && currentAction === 'start'"
           :disabled="isSubmitting || (productDetail?.stock ?? 0) <= 0"
           text="发起拼团"
           @click="handleSubmitGroupBuy('start')"
         />
         <BaseButton
-          class="w-full"
           type="default"
           :loading="isSubmitting && currentAction === 'join'"
-          :disabled="isSubmitting || (productDetail?.stock ?? 0) <= 0"
+          :disabled="
+            isSubmitting ||
+            (productDetail?.stock ?? 0) <= 0 ||
+            !openGroups.length ||
+            !selectedGroupId
+          "
           text="加入拼团"
           @click="handleSubmitGroupBuy('join')"
         />

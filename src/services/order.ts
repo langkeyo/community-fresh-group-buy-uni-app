@@ -1,5 +1,6 @@
 import {
   createOrderApi,
+  getOpenGroupListApi,
   getOrderDetailApi,
   getOrderListApi,
   getLeaderOrderListApi,
@@ -7,6 +8,8 @@ import {
   updateStatusApi,
   type BackendOrderItem,
   type CreateOrderReq
+  ,
+  type OpenGroupItem
 } from '@/api/order'
 import { backendOrderItemSchema, backendOrderListSchema } from '@/schemas/order'
 import type { OrderInfo } from '@/types/order'
@@ -102,4 +105,12 @@ export async function leaderConfirmPick(
 ): Promise<string> {
   const res = await leaderConfirmPickApi(orderId, leaderId, pickPointId)
   return res.data
+}
+
+export async function getOpenGroupList(
+  productId: number,
+  pickPointId: number
+): Promise<OpenGroupItem[]> {
+  const res = await getOpenGroupListApi(productId, pickPointId)
+  return res.data ?? []
 }

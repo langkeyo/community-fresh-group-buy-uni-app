@@ -46,6 +46,13 @@ export const updateStatusApi = (orderId: number | string, status: number) => {
   ) as unknown as Promise<Result<string>>
 }
 
+export interface OpenGroupItem {
+  groupBuyId: string
+  currentCount: number
+  targetCount: number
+  latestCreateTime: string
+}
+
 export const getLeaderOrderListApi = (
   leaderId: number,
   pickPointId: number,
@@ -64,4 +71,13 @@ export const leaderConfirmPickApi = (
   return http.put<Result<string>>(
     `/api/order/leader/confirm/${orderId}?leaderId=${leaderId}&pickPointId=${pickPointId}`
   ) as unknown as Promise<Result<string>>
+}
+
+export const getOpenGroupListApi = (
+  productId: number,
+  pickPointId: number
+) => {
+  return http.get<Result<OpenGroupItem[]>>('/api/order/group/open', {
+    params: { productId, pickPointId }
+  }) as unknown as Promise<Result<OpenGroupItem[]>>
 }
