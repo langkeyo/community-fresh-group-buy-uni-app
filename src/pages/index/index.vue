@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { getUserList } from '@/api/user'
 import { getProductList } from '@/services/product'
+import { getSystemConfig } from '@/services/system-config'
 import { onShow } from '@dcloudio/uni-app'
 import { ref } from 'vue'
+
+const PENDING_GOODS_CATEGORY_KEY = 'pending_goods_category'
 
 const bannerList = [
   {
@@ -69,6 +72,7 @@ const leaderList = ref<
 >([])
 
 const hotLoading = ref(false)
+const noticeText = ref('')
 
 function maskMobile(mobile?: string) {
   const text = String(mobile || '').trim()
@@ -79,6 +83,9 @@ function maskMobile(mobile?: string) {
 async function loadHomeData() {
   hotLoading.value = true
   try {
+    const config = await getSystemConfig()
+    noticeText.value = config.noticeText || ''
+
     const products = await getProductList()
     hotProductList.value = products.slice(0, 4).map((item) => {
       const groupPrice = item.groupPrice2 ?? item.groupPrice3 ?? item.price
@@ -109,6 +116,7 @@ async function loadHomeData() {
     })
     hotProductList.value = []
     leaderList.value = []
+    noticeText.value = ''
   } finally {
     hotLoading.value = false
   }
@@ -118,8 +126,17 @@ onShow(() => {
   loadHomeData()
 })
 
-function goToProductPage() {
+function goToProductPage(category?: string) {
+  if (category) {
+    uni.setStorageSync(PENDING_GOODS_CATEGORY_KEY, category)
+  } else {
+    uni.removeStorageSync(PENDING_GOODS_CATEGORY_KEY)
+  }
   uni.switchTab({ url: '/pages/goods/goods' })
+}
+
+function goToSearchPage() {
+  uni.navigateTo({ url: '/pages/search/search' })
 }
 
 function goToAiFoodPage() {
@@ -147,10 +164,17 @@ function goToHotGroupBuy(productId: number) {
 
 <template>
   <view class="min-h-screen bg-gray-50 px-4 pt-4 space-y-5">
+    <view
+      v-if="noticeText"
+      class="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3"
+    >
+      <text class="text-xs text-orange-700">{{ noticeText }}</text>
+    </view>
+
     <!-- 搜索框 -->
     <view
       class="flex items-center bg-white rounded-full h-14 px-5 text-base shadow-sm border border-gray-200"
-      @click="goToProductPage"
+      @click="goToSearchPage"
     >
       <text class="text-gray-400 text-base">搜索今日特价生鲜...</text>
     </view>
@@ -178,7 +202,7 @@ function goToHotGroupBuy(productId: number) {
           v-for="item in categoryList"
           :key="item.value"
           class="w-1/4 text-center"
-          @click="goToProductPage"
+          @click="goToProductPage(item.value)"
         >
           <view
             class="w-14 h-14 mx-auto flex rounded-full items-center justify-center"
