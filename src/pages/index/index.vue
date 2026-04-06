@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import { getUserList } from '@/api/user'
+import { getProductList } from '@/services/product'
+import { onShow } from '@dcloudio/uni-app'
+import { ref } from 'vue'
+
 const bannerList = [
   {
     id: 1,
@@ -42,30 +47,76 @@ const categoryList = [
   }
 ]
 
-const hotProductList = [
+const hotProductList = ref<
   {
-    id: 1,
-    name: '本地有机红番茄 500g',
-    image: 'https://loremflickr.com/300/300/tomato?lock=20',
-    price: '4.99',
-    originalPrice: '8.00',
-    people: 3,
-    sales: 1200
-  },
-  {
-    id: 2,
-    name: '进口香蕉 1kg',
-    image: 'https://loremflickr.com/300/300/banana?lock=21',
-    price: '9.90',
-    originalPrice: '15.00',
-    people: 2,
-    sales: 850
-  }
-]
+    id: number
+    name: string
+    image: string
+    groupLabel: string
+    stockLabel: string
+    price: string
+    originalPrice: string
+  }[]
+>([])
 
-const leaderList = [
-  { id: 1, name: '王阿姨', community: '阳光花园一期', members: 245 }
-]
+const leaderList = ref<
+  {
+    id: number
+    name: string
+    community: string
+    membersLabel: string
+  }[]
+>([])
+
+const hotLoading = ref(false)
+
+function maskMobile(mobile?: string) {
+  const text = String(mobile || '').trim()
+  if (!/^1\d{10}$/.test(text)) return '联系方式待完善'
+  return `${text.slice(0, 3)}****${text.slice(7)}`
+}
+
+async function loadHomeData() {
+  hotLoading.value = true
+  try {
+    const products = await getProductList()
+    hotProductList.value = products.slice(0, 4).map((item) => {
+      const groupPrice = item.groupPrice2 ?? item.groupPrice3 ?? item.price
+      const groupPeople = item.groupPrice3 != null ? 3 : 2
+      return {
+        id: item.id,
+        name: item.name,
+        image: item.images?.[0] || '',
+        groupLabel: `${groupPeople}人团`,
+        stockLabel: `库存${item.stock}`,
+        price: groupPrice.toFixed(2),
+        originalPrice: item.price.toFixed(2)
+      }
+    })
+
+    const usersRes = await getUserList()
+    const leaders = (usersRes.data || []).filter((u) => Boolean(u?.isLeader))
+    leaderList.value = leaders.slice(0, 1).map((item) => ({
+      id: item.id,
+      name: item.nickname || `团长#${item.id}`,
+      community: `联系方式：${maskMobile(item.mobile)}`,
+      membersLabel: `团长ID #${item.id}`
+    }))
+  } catch (error: any) {
+    uni.showToast({
+      title: error?.message || '首页数据加载失败',
+      icon: 'none'
+    })
+    hotProductList.value = []
+    leaderList.value = []
+  } finally {
+    hotLoading.value = false
+  }
+}
+
+onShow(() => {
+  loadHomeData()
+})
 
 function goToProductPage() {
   uni.switchTab({ url: '/pages/goods/goods' })
@@ -181,10 +232,10 @@ function goToHotGroupBuy(productId: number) {
           <view class="mt-2 flex items-center gap-1">
             <text
               class="text-xs text-primary border border-primary px-1 rounded"
-              >{{ item.people }}人团</text
+              >{{ item.groupLabel }}</text
             >
             <text class="text-xs text-gray-500 bg-gray-100 px-1 rounded"
-              >已拼{{ item.sales }}</text
+              >{{ item.stockLabel }}</text
             >
           </view>
 
@@ -199,10 +250,16 @@ function goToHotGroupBuy(productId: number) {
           </view>
         </view>
       </view>
+      <view v-if="hotLoading" class="py-2 text-center">
+        <text class="text-xs text-gray-400">加载中...</text>
+      </view>
+      <view v-else-if="!hotProductList.length" class="py-2 text-center">
+        <text class="text-xs text-gray-400">暂无可拼团商品</text>
+      </view>
     </view>
 
     <!-- 团长模块 -->
-    <view class="bg-white rounded-lg p-4 shadow-sm space-y-2">
+    <view class="bg-white rounded-lg p-4 shadow-sm space-y-2" v-if="leaderList.length">
       <text class="text-base font-bold text-fresh">今日明星团长</text>
 
       <view class="bg-secondary rounded-lg p-4 flex items-center gap-4">
@@ -216,7 +273,7 @@ function goToHotGroupBuy(productId: number) {
           }}</text>
         </view>
         <text class="text-xs text-gray-600"
-          >{{ leaderList[0].members }}人跟团</text
+          >{{ leaderList[0].membersLabel }}</text
         >
       </view>
     </view>

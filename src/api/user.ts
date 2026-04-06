@@ -45,3 +45,9 @@ export const testApi = () => {
     Result<string>
   >
 }
+
+export const getUserList = () => {
+  return http.get<Result<UserInfo[]>>('/api/user/list') as unknown as Promise<
+    Result<UserInfo[]>
+  >
+}
