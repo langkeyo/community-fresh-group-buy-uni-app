@@ -18,6 +18,7 @@ const lastQuery = ref('')
 const pendingQuery = ref('')
 const thinkingStage = ref('正在理解你的需求...')
 const FAVORITE_KEY = 'ai_favorites'
+const BUY_KEYWORDS_KEY = 'goods_buy_keywords'
 const favoriteMap = ref<Record<string, FavoriteItem>>({})
 const MIN_THINKING_MS = 900
 const THINKING_STAGE_LIST = [
@@ -132,6 +133,7 @@ const toggleCollect = (card: ChatCard) => {
       desc: card.desc,
       tags: card.tags,
       image: card.image,
+      ingredients: card.ingredients,
       steps: card.steps,
       source: card.source,
       disclaimer: card.disclaimer
@@ -185,6 +187,19 @@ const retryLast = async () => {
   if (!lastQuery.value || isThinking.value) return
   inputValue.value = lastQuery.value
   await handleSend()
+}
+
+const handleBuyIngredients = (card: ChatCard) => {
+  const names = card.ingredients
+    .map((x) => (x.name || '').trim())
+    .filter(Boolean)
+    .slice(0, 8)
+  if (!names.length) {
+    uni.showToast({ title: '当前菜谱暂无可购买食材', icon: 'none' })
+    return
+  }
+  uni.setStorageSync(BUY_KEYWORDS_KEY, names)
+  uni.switchTab({ url: '/pages/goods/goods' })
 }
 
 loadFavorites()
@@ -318,6 +333,19 @@ loadFavorites()
               {{ card.disclaimer }}
             </text>
 
+            <view v-if="card.ingredients.length" class="mb-3">
+              <text class="text-xs text-gray-500 block mb-2">推荐食材</text>
+              <view class="flex flex-wrap gap-2">
+                <text
+                  v-for="ing in card.ingredients"
+                  :key="`${ing.name}-${ing.amount}-${ing.unit}`"
+                  class="text-[22rpx] bg-orange-50 text-orange-600 px-2 py-1 rounded"
+                >
+                  {{ ing.name }} {{ ing.amount }}{{ ing.unit }}
+                </text>
+              </view>
+            </view>
+
             <!-- 步骤 -->
             <view class="bg-[#F8F8F8] rounded-lg p-3">
               <view
@@ -337,12 +365,11 @@ loadFavorites()
             </view>
 
             <view class="mt-3 pt-3 border-t border-gray-100 flex justify-end">
-              <view class="flex items-center space-x-2">
-                <text
-                  class="text-xs text-[#F08800] border border-[#F08800] px-2 py-1 rounded-full"
-                  >一键买齐食材</text
-                >
-              </view>
+              <BaseButton
+                type="default"
+                text="一键买齐食材"
+                @click="handleBuyIngredients(card)"
+              />
             </view>
           </view>
         </view>

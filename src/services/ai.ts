@@ -30,6 +30,13 @@ export async function getAiRecipeRecommend(
     desc: data.recipe.desc || '暂无描述',
     tags: data.recipe.tags || [],
     image: data.recipe.image || 'https://loremflickr.com/500/300/food?lock=501',
+    ingredients: (data.recipe.ingredients || [])
+      .map((x) => ({
+        name: (x.name || '').trim(),
+        amount: (x.amount || '').trim(),
+        unit: (x.unit || '').trim()
+      }))
+      .filter((x) => Boolean(x.name)),
     steps: (data.recipe.steps || []).map((step, index) => ({
       step: Number(step.step) || index + 1,
       content: step.content || ''

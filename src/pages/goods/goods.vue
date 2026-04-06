@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseCard from '@/components/base/BaseCard.vue'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { getProductList } from '@/services/product'
 import type { ProductItem } from '@/types/product'
-import { onPullDownRefresh } from '@dcloudio/uni-app'
+import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
 
 const goodsList = ref<ProductItem[]>([])
+const PENDING_GOODS_CATEGORY_KEY = 'pending_goods_category'
+const BUY_KEYWORDS_KEY = 'goods_buy_keywords'
 
 const sortList = ['默认', '价格', '库存']
 const activeCategory = ref('all')
 const activeSort = ref('默认')
 const keyword = ref('')
+const buyKeywords = ref<string[]>([])
 const loading = ref(false)
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -25,6 +28,13 @@ async function fetchGoods() {
   loading.value = true
   try {
     goodsList.value = await getProductList()
+    const categorySet = new Set(goodsList.value.map((item) => item.category))
+    if (
+      activeCategory.value !== 'all' &&
+      !categorySet.has(activeCategory.value)
+    ) {
+      activeCategory.value = 'all'
+    }
   } catch (error: any) {
     uni.showToast({ title: error?.message || '商品加载失败', icon: 'none' })
     goodsList.value = []
@@ -43,6 +53,12 @@ const filteredGoods = computed(() => {
     list = list.filter((item) => item.name.includes(keyword.value.trim()))
   }
 
+  if (buyKeywords.value.length) {
+    list = list.filter((item) =>
+      buyKeywords.value.some((k) => item.name.includes(k))
+    )
+  }
+
   if (activeSort.value === '价格') {
     list = [...list].sort((a, b) => a.price - b.price)
   } else if (activeSort.value === '库存') {
@@ -57,7 +73,9 @@ const viewGoods = computed(() => {
     ...item,
     categoryLabel: CATEGORY_LABEL[item.category] || item.category || '未分类',
     groupPriceDisplay: (
-      item.groupPrice2 ?? item.groupPrice3 ?? item.price
+      item.groupPrice2 ??
+      item.groupPrice3 ??
+      item.price
     ).toFixed(2),
     originPriceDisplay: item.price.toFixed(2),
     cover: item.images[0] || ''
@@ -84,6 +102,36 @@ onMounted(() => {
   fetchGoods()
 })
 
+onShow(() => {
+  const pendingCategory = String(
+    uni.getStorageSync(PENDING_GOODS_CATEGORY_KEY) || ''
+  ).trim()
+  if (pendingCategory) {
+    activeCategory.value = pendingCategory
+    uni.removeStorageSync(PENDING_GOODS_CATEGORY_KEY)
+  }
+
+  const rawKeywords = uni.getStorageSync(BUY_KEYWORDS_KEY)
+  const keywordList = Array.isArray(rawKeywords)
+    ? rawKeywords.map((x) => String(x || '').trim()).filter(Boolean)
+    : []
+  if (keywordList.length) {
+    buyKeywords.value = keywordList
+    keyword.value = ''
+    uni.removeStorageSync(BUY_KEYWORDS_KEY)
+    uni.showToast({
+      title: `已为您匹配食材：${keywordList.slice(0, 2).join('、')}`,
+      icon: 'none'
+    })
+  }
+})
+
+watch(keyword, (val) => {
+  if (val.trim()) {
+    buyKeywords.value = []
+  }
+})
+
 onPullDownRefresh(async () => {
   await fetchGoods()
   uni.stopPullDownRefresh()
@@ -97,14 +145,15 @@ onPullDownRefresh(async () => {
 
     <!-- 搜索框 -->
     <view
-      class="flex items-center bg-white rounded-full h-12 px-4 shadow-sm border border-gray-200"
+      class="flex items-center bg-white rounded-full h-12 px-4 py-4 shadow-sm border border-gray-200"
     >
+      <uni-icons type="search" size="18" color="#9CA3AF" />
       <input
         type="text"
         v-model="keyword"
         placeholder="搜索商品/关键词..."
-        placeholder-class="text-gray-400 text-sm"
-        class="flex-1 text-sm base-input base-input--search"
+        placeholder-class="text-gray-400 text-base"
+        class="flex-1 ml-2 text-base"
       />
     </view>
 
@@ -116,7 +165,9 @@ onPullDownRefresh(async () => {
         @click="activeCategory = 'all'"
       />
       <BaseButton
-        v-for="item in Array.from(new Set(goodsList.map((g) => g.category))).filter(Boolean)"
+        v-for="item in Array.from(
+          new Set(goodsList.map((g) => g.category))
+        ).filter(Boolean)"
         :key="item"
         :type="item === activeCategory ? 'primary' : 'default'"
         :text="CATEGORY_LABEL[item] || item"
@@ -142,22 +193,25 @@ onPullDownRefresh(async () => {
         :key="item.id"
         @click="goToDetail(item.id)"
       >
-        <view class="flex gap-3">
+        <view class="flex gap-3 h-28">
           <image
             v-if="item.cover"
             :src="item.cover"
             mode="aspectFill"
-            class="w-20 h-20 bg-secondary rounded-md"
+            class="w-28 h-28 bg-secondary rounded-md flex-shrink-0"
           />
-          <view v-else class="w-20 h-20 bg-secondary rounded-md"></view>
-          <view class="flex-1">
-            <text class="block text-base font-bold text-fresh">{{
+          <view
+            v-else
+            class="w-28 h-28 bg-secondary rounded-md flex-shrink-0"
+          ></view>
+          <view class="flex-1 min-w-0 h-28 flex flex-col overflow-hidden">
+            <text class="block text-base font-bold text-fresh line-clamp-2">{{
               item.name
             }}</text>
             <text class="block text-xs text-gray-500 mt-1"
               >商品编号：{{ item.id }}</text
             >
-            <view class="mt-2 flex items-center gap-2">
+            <view class="mt-auto pt-2 flex items-center gap-2">
               <text class="text-xs text-primary">团购价</text>
               <text class="text-base font-bold text-primary">
                 ￥{{ item.groupPriceDisplay }}
@@ -167,8 +221,15 @@ onPullDownRefresh(async () => {
               >
               <text class="text-xs text-gray-400">库存 {{ item.stock }}</text>
             </view>
-            <view class="mt-3">
-              <BaseButton type="default" text="去拼团" @click.stop="goToGroupBuy(item.id)" />
+          </view>
+          <view class="h-28 flex items-end pb-1 flex-shrink-0">
+            <view
+              class="px-6 py-3 rounded-full border bg-primary text-white text-sm flex items-center justify-center transition-colors duration-150 active:bg-orange-600"
+              hover-class="opacity-80"
+              :hover-stay-time="100"
+              @click.stop="goToGroupBuy(item.id)"
+            >
+              去拼团
             </view>
           </view>
         </view>

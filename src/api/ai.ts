@@ -6,11 +6,18 @@ export interface AiRecipeStepResp {
   content: string
 }
 
+export interface AiRecipeIngredientResp {
+  name: string
+  amount: string
+  unit: string
+}
+
 export interface AiRecipeResp {
   title: string
   desc: string
   tags: string[]
   image: string
+  ingredients: AiRecipeIngredientResp[]
   steps: AiRecipeStepResp[]
 }
 
