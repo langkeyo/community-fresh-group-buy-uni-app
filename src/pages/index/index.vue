@@ -74,6 +74,24 @@ function goToProductPage() {
 function goToAiFoodPage() {
   uni.navigateTo({ url: '/pages/ai-food/ai-food' })
 }
+
+function goToHotGroupBuy(productId: number) {
+  const storedPickId = Number(uni.getStorageSync('default_pick_point_id'))
+  const hasDefaultPick = Number.isFinite(storedPickId) && storedPickId > 0
+
+  if (!hasDefaultPick) {
+    uni.showToast({
+      title: '请先选择默认自提点',
+      icon: 'none'
+    })
+    uni.navigateTo({ url: '/pages/self-pick/self-pick' })
+    return
+  }
+
+  uni.navigateTo({
+    url: `/pages/group-buy/group-buy?id=${productId}&pickPointId=${storedPickId}`
+  })
+}
 </script>
 
 <template>
@@ -148,7 +166,7 @@ function goToAiFoodPage() {
           v-for="item in hotProductList"
           :key="item.id"
           class="bg-white rounded-lg p-4 shadow-sm"
-          @click="goToProductPage"
+          @click="goToHotGroupBuy(item.id)"
         >
           <!-- <view class="w-full h-20 bg-secondary rounded-md mb-2"></view> -->
           <image
