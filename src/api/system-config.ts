@@ -7,6 +7,16 @@ export interface SystemConfigResp {
   serviceWechat: string
   serviceHours: string
   serviceTerms: string
+  recommendMenus: {
+    name: string
+    value: string
+    bg: string
+    color: string
+    icon: string
+    iconColor: string
+    enabled: boolean
+    sort: number
+  }[]
 }
 
 export const getSystemConfigApi = () => {

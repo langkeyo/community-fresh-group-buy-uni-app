@@ -2,6 +2,7 @@
 import { getUserList } from '@/api/user'
 import { getProductList } from '@/services/product'
 import { getSystemConfig } from '@/services/system-config'
+import type { RecommendMenuItem } from '@/types/system-config'
 import { onShow } from '@dcloudio/uni-app'
 import { ref } from 'vue'
 
@@ -15,40 +16,7 @@ const bannerList = [
   }
 ]
 
-const categoryList = [
-  {
-    name: '蔬菜',
-    value: 'vegetable',
-    bg: 'bg-green-100',
-    color: 'text-green-600',
-    icon: 'fire-filled',
-    iconColor: '#16a34a'
-  },
-  {
-    name: '水果',
-    value: 'fruit',
-    bg: 'bg-red-100',
-    color: 'text-red-600',
-    icon: 'gift-filled',
-    iconColor: '#dc2626'
-  },
-  {
-    name: '肉蛋',
-    value: 'meat',
-    bg: 'bg-orange-100',
-    color: 'text-orange-600',
-    icon: 'cart-filled',
-    iconColor: '#ea580c'
-  },
-  {
-    name: '海鲜',
-    value: 'seafood',
-    bg: 'bg-blue-100',
-    color: 'text-blue-600',
-    icon: 'flag-filled',
-    iconColor: '#2563eb'
-  }
-]
+const categoryList = ref<RecommendMenuItem[]>([])
 
 const hotProductList = ref<
   {
@@ -85,6 +53,7 @@ async function loadHomeData() {
   try {
     const config = await getSystemConfig()
     noticeText.value = config.noticeText || ''
+    categoryList.value = config.recommendMenus || []
 
     const products = await getProductList()
     hotProductList.value = products.slice(0, 4).map((item) => {
@@ -116,7 +85,6 @@ async function loadHomeData() {
     })
     hotProductList.value = []
     leaderList.value = []
-    noticeText.value = ''
   } finally {
     hotLoading.value = false
   }
