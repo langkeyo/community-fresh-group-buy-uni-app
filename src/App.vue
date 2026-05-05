@@ -18,6 +18,9 @@ onHide(() => {
 page {
   @apply bg-gray-50;
   animation: pageFadeIn 0.25s ease;
+  font-family: Inter, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC',
+    'Source Han Sans SC', sans-serif;
+  text-rendering: optimizeLegibility;
 }
 
 .base-input {

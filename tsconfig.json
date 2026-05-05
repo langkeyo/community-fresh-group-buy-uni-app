@@ -3,6 +3,8 @@
   "compilerOptions": {
     "sourceMap": true,
     "moduleResolution": "bundler",
+    "importsNotUsedAsValues": "remove",
+    "preserveValueImports": false,
     "verbatimModuleSyntax": true,
     "paths": {
       "@/*": ["./src/*"]

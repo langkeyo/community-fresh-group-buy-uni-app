@@ -10,23 +10,44 @@ const keyword = ref('')
 const points = ref<PickPointItem[]>([])
 const loading = ref(false)
 const selectedPickId = ref<number | null>(null)
+const normalizedKeyword = computed(() => keyword.value.trim().toLowerCase())
 
 // --- 计算属性 ---
 const filteredPoints = computed(() => {
-  return points.value
-    .filter(
-      (p) => p.name.includes(keyword.value) || p.address.includes(keyword.value)
-    )
+  const q = normalizedKeyword.value
+  if (!q) return points.value
+  return points.value.filter((p) => {
+    const name = p.name.toLowerCase()
+    const address = p.address.toLowerCase()
+    return name.includes(q) || address.includes(q)
+  })
 })
 
 // --- 方法 ---
 const openMap = (point: PickPointItem) => {
-  // 模拟打开地图
-  uni.openLocation({
-    latitude: 39.909, // Mock 坐标
-    longitude: 116.397,
-    name: point.name,
-    address: point.address
+  const latitude = Number(point.latitude)
+  const longitude = Number(point.longitude)
+  if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+    // 微信小程序内会调用腾讯地图能力打开定位
+    uni.openLocation({
+      latitude,
+      longitude,
+      name: point.name,
+      address: point.address
+    })
+    return
+  }
+
+  uni.showModal({
+    title: '暂不支持一键导航',
+    content: '当前网点未配置腾讯地图坐标，无法精准导航。是否复制地址到剪贴板？',
+    confirmText: '复制地址',
+    success: (res) => {
+      if (!res.confirm) return
+      uni.setClipboardData({
+        data: `${point.name} ${point.address}`
+      })
+    }
   })
 }
 
@@ -62,16 +83,29 @@ onMounted(() => {
 <template>
   <view class="min-h-screen bg-[#F8F8F8]">
     <!-- 搜索栏 -->
-    <view class="bg-white p-3 sticky top-0 border-b border-gray-100 z-10">
-      <view class="bg-[#F8F8F8] rounded-full flex items-center px-3 h-10">
-        <text class="text-gray-400 mr-2">🔍</text>
-        <input
-          v-model="keyword"
-          type="text"
-          placeholder="搜索附近自提点/小区"
-          placeholder-class="text-gray-400 text-sm"
-          class="flex-1 text-sm text-[#2F5233] base-input"
-        />
+    <view
+      class="bg-white px-4 pt-3 pb-2 sticky top-0 border-b border-gray-100 z-10"
+    >
+      <view
+        class="h-14 p-1 bg-white border border-gray-200 rounded-full shadow-sm"
+      >
+        <view class="h-full flex items-center px-3 bg-gray-100 rounded-full">
+          <uni-icons type="search" size="18" color="#9CA3AF" />
+          <input
+            v-model="keyword"
+            type="text"
+            placeholder="搜索附近自提点/小区"
+            placeholder-class="text-gray-400 text-base"
+            class="flex-1 ml-2 text-base text-[#2F5233] h-full"
+          />
+          <view
+            v-if="keyword"
+            class="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center"
+            @click="keyword = ''"
+          >
+            <text class="text-xs text-gray-500">×</text>
+          </view>
+        </view>
       </view>
     </view>
 

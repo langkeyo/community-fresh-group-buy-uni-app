@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { login, getUserInfo } from '@/api/user' // 引入咱们封装好的接口
+import BaseSmartImage from '@/components/base/BaseSmartImage.vue'
+import { getUserInfo } from '@/api/user' // 引入咱们封装好的接口
 import { getLeaderWorkbench } from '@/services/order'
 import type { UserInfo } from '@/types/user' // 引入类型定义
+import { DEFAULT_AVATAR_PATH } from '@/constants/ui'
 import { onShow } from '@dcloudio/uni-app' // 生命周期钩子
 
 // --- 状态定义 ---
@@ -12,6 +14,8 @@ const leaderSummaryText = ref('进入工作台查看待核销订单')
 
 // 默认的工具栏数据
 const tools = [
+  { name: '通知中心', icon: 'notification', color: '#F08800', route: '/pages/notice/notice' },
+  { name: '设置', icon: 'gear', color: '#2F5233', route: '/pages/settings/settings' },
   { name: '收货地址', icon: 'location', color: '#F08800', route: '/pages/address/address' },
   { name: '自提网点', icon: 'location', color: '#2F5233', route: '/pages/self-pick/self-pick' },
   { name: '联系客服', icon: 'headphones', color: '#2F5233', route: '/pages/service/service' },
@@ -106,13 +110,13 @@ const goToLeader = () => {
 }
 
 const applyLeader = () => {
-  // 暂时模拟申请
   uni.showModal({
-    title: '申请团长',
-    content: '确定要申请成为团长吗？',
+    title: '团长权限开通',
+    content: '当前版本采用管理员审核开通，请联系客服提交申请信息。',
+    confirmText: '去联系客服',
     success: (res) => {
       if (res.confirm) {
-        uni.showToast({ title: '申请已提交', icon: 'success' })
+        uni.navigateTo({ url: '/pages/service/service' })
       }
     }
   })
@@ -120,21 +124,27 @@ const applyLeader = () => {
 
 const handleSetting = () => {
   if (!isLogin.value) return uni.showToast({ title: '请先登录', icon: 'none' })
-  // 这里可以跳转到设置页，或者退出登录
-  uni.showActionSheet({
-    itemList: ['退出登录'],
-    success: (res) => {
-      if (res.tapIndex === 0) {
-        uni.removeStorageSync('token')
-        uni.removeStorageSync('userInfo')
-        checkLoginStatus()
-        uni.showToast({ title: '已退出', icon: 'none' })
-      }
-    }
-  })
+  uni.navigateTo({ url: '/pages/settings/settings' })
 }
 
 const handleToolClick = (route: string) => {
+  const loginRequiredRoutes = [
+    '/pages/notice/notice',
+    '/pages/settings/settings',
+    '/pages/address/address'
+  ]
+  if (loginRequiredRoutes.includes(route) && !isLogin.value) {
+    uni.showModal({
+      title: '请先登录',
+      content: '该功能需要登录后使用，是否前往登录页？',
+      success: (res) => {
+        if (res.confirm) {
+          uni.navigateTo({ url: '/pages/login/login' })
+        }
+      }
+    })
+    return
+  }
   uni.navigateTo({ url: route })
 }
 </script>
@@ -151,10 +161,12 @@ const handleToolClick = (route: string) => {
       <!-- 登录/用户信息区域 -->
       <view class="flex items-center" @click="handleLogin">
         <!-- 头像：已登录显示头像，未登录显示默认 -->
-        <image
-          :src="userInfo?.avatar || '/static/logo.webp'"
-          mode="aspectFill"
-          class="w-16 h-16 rounded-full border-2 border-white bg-white mr-4"
+        <BaseSmartImage
+          :src="userInfo?.avatar || DEFAULT_AVATAR_PATH"
+          class-name="w-16 h-16 rounded-full border-2 border-white bg-white mr-4 overflow-hidden"
+          fallback-bg="#ffffff"
+          fallback-color="#2f5233"
+          fallback-text="头像"
         />
 
         <view class="flex flex-col text-white">
@@ -187,30 +199,29 @@ const handleToolClick = (route: string) => {
       </view>
     </view>
 
-    <!-- 2. 资产卡片 (注意：目前后端还没返回余额和积分，先做兜底显示) -->
+    <!-- 2. 资产卡片 -->
     <view
       class="mx-4 -mt-10 bg-white rounded-xl shadow-sm p-4 flex justify-around mb-4 relative z-10"
     >
       <view class="flex flex-col items-center">
-        <text class="text-lg font-bold text-[#2F5233]">
-          {{ '0.00' }}
-          <!-- {{ userInfo?.balance || '0.00' }} 等后端加了字段用这个 -->
-        </text>
+        <text class="text-lg font-bold text-[#2F5233]">暂未开通</text>
         <text class="text-xs text-gray-500">余额</text>
       </view>
       <view class="w-[1px] bg-gray-100 h-8"></view>
       <view class="flex flex-col items-center">
-        <text class="text-lg font-bold text-[#2F5233]">
-          {{ 0 }}
-          <!-- {{ userInfo?.coupons || 0 }} -->
-        </text>
+        <text class="text-lg font-bold text-[#2F5233]">暂未开通</text>
         <text class="text-xs text-gray-500">优惠券</text>
       </view>
       <view class="w-[1px] bg-gray-100 h-8"></view>
       <view class="flex flex-col items-center">
-        <text class="text-lg font-bold text-[#2F5233]">0</text>
+        <text class="text-lg font-bold text-[#2F5233]">暂未开通</text>
         <text class="text-xs text-gray-500">积分</text>
       </view>
+    </view>
+    <view class="mx-4 -mt-2 mb-4">
+      <text class="text-[22rpx] text-gray-400"
+        >资产能力状态：LIMITED（后端字段暂未开放）</text
+      >
     </view>
 
     <!-- 3. 团长入口 (根据 isLeader 状态动态显示) -->
@@ -235,7 +246,38 @@ const handleToolClick = (route: string) => {
         <uni-icons type="right" size="16" color="#ffffff"></uni-icons>
       </view>
 
-      <!-- 不是团长 / 未登录 -->
+      <!-- 未登录 -->
+      <view
+        v-else-if="!isLogin"
+        class="bg-[#FFF7E6] rounded-xl p-4 flex justify-between items-center active:bg-[#ffefcc] transition-colors"
+        @click="handleLogin"
+      >
+        <view class="flex items-center">
+          <uni-icons
+            type="person-filled"
+            size="28"
+            color="#F08800"
+            class="mr-3"
+          ></uni-icons>
+          <view>
+            <text class="font-bold text-[#8a5a00] text-lg block">登录后可申请团长</text>
+            <text class="text-xs text-gray-500">请先完成账号登录</text>
+          </view>
+        </view>
+        <view
+          class="bg-[#F08800] text-white px-3 py-1.5 rounded-full text-xs flex items-center"
+        >
+          去登录
+          <uni-icons
+            type="arrowright"
+            size="12"
+            color="#ffffff"
+            class="ml-1"
+          ></uni-icons>
+        </view>
+      </view>
+
+      <!-- 已登录但不是团长 -->
       <view
         v-else
         class="bg-[#E8F5E9] rounded-xl p-4 flex justify-between items-center active:bg-[#dceddd] transition-colors"
@@ -250,15 +292,15 @@ const handleToolClick = (route: string) => {
           ></uni-icons>
           <view>
             <text class="font-bold text-[#2F5233] text-lg block"
-              >招募社区团长</text
+              >申请团长权限</text
             >
-            <text class="text-xs text-gray-500">0元入驻，月赚3000+</text>
+            <text class="text-xs text-gray-500">管理员审核后开通</text>
           </view>
         </view>
         <view
           class="bg-[#2F5233] text-white px-3 py-1.5 rounded-full text-xs flex items-center"
         >
-          立即申请
+          去申请
           <uni-icons
             type="arrowright"
             size="12"
@@ -270,22 +312,22 @@ const handleToolClick = (route: string) => {
     </view>
 
     <!-- 4. 常用功能列表 -->
-    <view class="bg-white mx-4 rounded-xl shadow-sm overflow-hidden">
+    <view class="panel-card mx-4 overflow-hidden">
       <view
         v-for="(item, index) in tools"
         :key="index"
-        class="flex items-center justify-between p-5 border-b border-gray-50 active:bg-gray-50"
+        class="tool-row"
         @click="handleToolClick(item.route)"
       >
-        <view class="flex items-center">
-          <view class="mr-3 w-6 flex justify-center">
+        <view class="tool-left">
+          <view class="tool-icon-wrap">
             <uni-icons
               :type="item.icon"
               size="24"
               :color="item.color"
             ></uni-icons>
           </view>
-          <text class="text-base text-[#2F5233]">{{ item.name }}</text>
+          <text class="tool-name">{{ item.name }}</text>
         </view>
         <uni-icons type="right" size="16" color="#cccccc"></uni-icons>
       </view>
@@ -307,5 +349,38 @@ const handleToolClick = (route: string) => {
 </template>
 
 <style>
-/* 样式保持不变 */
+.panel-card {
+  background: #fff;
+  border-radius: 16rpx;
+  box-shadow: 0 8rpx 20rpx rgba(15, 23, 42, 0.05);
+}
+
+.tool-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 20rpx;
+  border-bottom: 1rpx solid #f1f5f9;
+}
+
+.tool-row:active {
+  background: #f8fafc;
+}
+
+.tool-left {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+}
+
+.tool-icon-wrap {
+  width: 42rpx;
+  display: flex;
+  justify-content: center;
+}
+
+.tool-name {
+  font-size: 30rpx;
+  color: #2f5233;
+}
 </style>

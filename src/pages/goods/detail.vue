@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import BaseButton from '@/components/base/BaseButton.vue'
+import BaseSmartImage from '@/components/base/BaseSmartImage.vue'
 import { getProductDetail } from '@/services/product'
 import type { ProductItem } from '@/types/product'
 import { onLoad, onPullDownRefresh } from '@dcloudio/uni-app'
@@ -91,10 +92,16 @@ onPullDownRefresh(async () => {
         indicator-dots
         circular
         autoplay
-        interval="3000"
+        :interval="3000"
       >
         <swiper-item v-for="img in imageList" :key="img">
-          <image :src="img" mode="aspectFill" class="w-full h-56" />
+          <BaseSmartImage
+            :src="img"
+            class-name="w-full h-56"
+            fallback-bg="#eef2f7"
+            fallback-color="#667085"
+            fallback-text="商品图片"
+          />
         </swiper-item>
       </swiper>
       <view v-else class="w-full h-56 bg-gray-200"></view>

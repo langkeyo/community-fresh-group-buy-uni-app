@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseCard from '@/components/base/BaseCard.vue'
+import BaseSmartImage from '@/components/base/BaseSmartImage.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { getProductList } from '@/services/product'
 import type { ProductItem } from '@/types/product'
@@ -191,19 +192,17 @@ onPullDownRefresh(async () => {
       <BaseCard
         v-for="item in viewGoods"
         :key="item.id"
+        class="goods-card"
         @click="goToDetail(item.id)"
       >
         <view class="flex gap-3 h-28">
-          <image
-            v-if="item.cover"
+          <BaseSmartImage
             :src="item.cover"
-            mode="aspectFill"
-            class="w-28 h-28 bg-secondary rounded-md flex-shrink-0"
+            class-name="w-28 h-28 bg-secondary rounded-md flex-shrink-0"
+            fallback-bg="#eef2f7"
+            fallback-color="#667085"
+            :fallback-text="item.name"
           />
-          <view
-            v-else
-            class="w-28 h-28 bg-secondary rounded-md flex-shrink-0"
-          ></view>
           <view class="flex-1 min-w-0 h-28 flex flex-col overflow-hidden">
             <text class="block text-base font-bold text-fresh line-clamp-2">{{
               item.name
@@ -224,7 +223,7 @@ onPullDownRefresh(async () => {
           </view>
           <view class="h-28 flex items-end pb-1 flex-shrink-0">
             <view
-              class="px-6 py-3 rounded-full border bg-primary text-white text-sm flex items-center justify-center transition-colors duration-150 active:bg-orange-600"
+              class="buy-btn"
               hover-class="opacity-80"
               :hover-stay-time="100"
               @click.stop="goToGroupBuy(item.id)"
@@ -251,3 +250,25 @@ onPullDownRefresh(async () => {
     </view>
   </view>
 </template>
+
+<style scoped>
+.goods-card:active {
+  transform: scale(0.995);
+}
+
+.buy-btn {
+  padding: 10rpx 24rpx;
+  border-radius: 9999rpx;
+  border: 1rpx solid #f08800;
+  background: #f08800;
+  color: #fff;
+  font-size: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.buy-btn:active {
+  background: #e67700;
+}
+</style>

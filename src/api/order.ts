@@ -7,6 +7,10 @@ export interface BackendOrderItem {
   name: string
   qty: number
   price: string
+  couponId?: string
+  couponTitle?: string
+  couponAmount?: string
+  remark?: string
   pickPointName: string
   pickPointAddress: string
   status: number
@@ -19,6 +23,10 @@ export interface CreateOrderReq {
   totalPrice: number
   pickPointId: number
   groupBuyId?: string | null
+  couponId?: string
+  couponTitle?: string
+  couponAmount?: number
+  remark?: string
 }
 
 export const createOrderApi = (data: CreateOrderReq) => {

@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseField from '@/components/base/BaseField.vue'
+import BaseSmartImage from '@/components/base/BaseSmartImage.vue'
 import { createOrder, getOpenGroupList } from '@/services/order'
 import type { OpenGroupItem } from '@/api/order'
 import { getPickPointDetail } from '@/services/pick-point'
 import { getProductDetail } from '@/services/product'
+import { useOrderStore } from '@/stores/order'
 import type { ProductItem } from '@/types/product'
 import { useUserStore } from '@/stores/user'
 import { onLoad } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 
 const userStore = useUserStore()
+const orderStore = useOrderStore()
 const ORDER_REFRESH_FLAG = 'order_need_refresh'
 const isSubmitting = ref(false)
 const currentAction = ref<'start' | 'join' | ''>('')
@@ -18,7 +21,9 @@ const formData = ref({
   groupType: 2,
   receiverName: '',
   mobile: '',
-  pickupPoint: ''
+  pickupPoint: '',
+  couponId: 'none',
+  remark: ''
 })
 const productId = ref<number | null>(null)
 const pickPointId = ref<number | null>(null)
@@ -64,6 +69,27 @@ const progressWidth = computed(() => {
     Math.min(1, progressCurrent.value / Math.max(1, progressTarget.value))
   )
   return `${Math.round(ratio * 100)}%`
+})
+
+const selectedCoupon = computed(() => {
+  return (
+    orderStore.getCouponById(formData.value.couponId) ||
+    orderStore.couponList[0]
+  )
+})
+
+const couponDiscount = computed(() => {
+  const coupon = selectedCoupon.value
+  if (!coupon) return 0
+  const subtotal = Number(displayPrice.value || 0)
+  if (subtotal < coupon.minimumSpend) return 0
+  return coupon.discount
+})
+
+const finalPayable = computed(() => {
+  const subtotal = Number(displayPrice.value || 0)
+  const payable = Math.max(0, subtotal - couponDiscount.value)
+  return payable.toFixed(2)
 })
 
 function validateForm() {
@@ -116,12 +142,30 @@ async function submitGroupBuy(
   const payload = {
     userId: userStore.userId,
     productId: productId,
-    totalPrice: groupPrice,
+    totalPrice: Number(finalPayable.value),
     pickPointId: pickPointId,
-    groupBuyId
+    groupBuyId,
+    couponId:
+      selectedCoupon.value?.id !== 'none'
+        ? selectedCoupon.value?.id
+        : undefined,
+    couponTitle:
+      selectedCoupon.value?.id !== 'none'
+        ? selectedCoupon.value?.title
+        : undefined,
+    couponAmount: couponDiscount.value > 0 ? couponDiscount.value : undefined,
+    remark: formData.value.remark.trim() || undefined
   }
 
-  await createOrder(payload)
+  const orderId = await createOrder(payload)
+  if (orderId) {
+    orderStore.saveOrderMeta(orderId, {
+      couponId: payload.couponId,
+      couponTitle: payload.couponTitle,
+      couponAmount: payload.couponAmount ? payload.couponAmount.toFixed(2) : '',
+      remark: payload.remark || ''
+    })
+  }
 
   uni.showToast({
     title: action === 'start' ? '发起拼团成功' : '加入拼团成功',
@@ -134,7 +178,9 @@ function resetForm() {
     groupType: 2,
     receiverName: '',
     mobile: '',
-    pickupPoint: ''
+    pickupPoint: '',
+    couponId: 'none',
+    remark: ''
   }
 }
 
@@ -269,13 +315,13 @@ onLoad(async (query) => {
 
     <!-- 商品信息区 -->
     <view class="p-4 space-y-2 bg-white rounded-lg shadow-sm">
-      <image
-        v-if="coverImage"
+      <BaseSmartImage
         :src="coverImage"
-        mode="aspectFill"
-        class="w-full h-32 rounded-md bg-secondary"
+        class-name="w-full h-32 rounded-md bg-secondary"
+        fallback-bg="#eef2f7"
+        fallback-color="#667085"
+        :fallback-text="productName"
       />
-      <view v-else class="w-full h-32 rounded-md bg-secondary"></view>
       <text class="text-base font-bold text-fresh">{{ productName }}</text>
       <view class="flex items-center gap-2">
         <text class="text-xs text-primary">￥</text>
@@ -306,7 +352,10 @@ onLoad(async (query) => {
       </view>
 
       <view class="h-2 overflow-hidden bg-gray-200 rounded-full">
-        <view class="h-full bg-primary" :style="{ width: progressWidth }"></view>
+        <view
+          class="h-full bg-primary"
+          :style="{ width: progressWidth }"
+        ></view>
       </view>
     </view>
 
@@ -334,10 +383,16 @@ onLoad(async (query) => {
           @click="pickOpenGroup(item)"
         >
           <view class="flex items-center justify-between">
-            <text class="text-sm text-fresh">拼团号：{{ item.groupBuyId.slice(0, 12) }}</text>
-            <text class="text-xs text-gray-500">{{ item.currentCount }}/{{ item.targetCount }} 人</text>
+            <text class="text-sm text-fresh"
+              >拼团号：{{ item.groupBuyId.slice(0, 12) }}</text
+            >
+            <text class="text-xs text-gray-500"
+              >{{ item.currentCount }}/{{ item.targetCount }} 人</text
+            >
           </view>
-          <text class="block text-xs text-gray-400 mt-1">最近下单：{{ item.latestCreateTime || '-' }}</text>
+          <text class="block text-xs text-gray-400 mt-1"
+            >最近下单：{{ item.latestCreateTime || '-' }}</text
+          >
         </view>
       </view>
     </view>
@@ -388,6 +443,34 @@ onLoad(async (query) => {
           {{ formData.pickupPoint || '默认自提点（后续接真实选择）' }}
         </text>
       </BaseField>
+
+      <BaseField label="优惠券">
+        <view class="flex flex-wrap gap-2 px-3 py-3">
+          <view
+            v-for="coupon in orderStore.couponList"
+            :key="coupon.id"
+            class="px-3 py-1.5 rounded-full border text-xs"
+            :class="
+              formData.couponId === coupon.id
+                ? 'bg-primary text-white border-primary'
+                : 'bg-white text-gray-600 border-gray-200'
+            "
+            @click="formData.couponId = coupon.id"
+          >
+            {{ coupon.title }}
+          </view>
+        </view>
+      </BaseField>
+
+      <BaseField label="备注">
+        <textarea
+          v-model="formData.remark"
+          :maxlength="80"
+          class="w-full px-4 py-3 text-sm text-gray-700 bg-transparent"
+          placeholder="例如：不要香菜、18:30后自提"
+          auto-height
+        />
+      </BaseField>
     </view>
 
     <!-- 占位：给底部固定按钮留出空间 -->
@@ -410,14 +493,30 @@ onLoad(async (query) => {
       class="fixed left-0 right-0 bottom-0 bg-white border-t border-gray-100 px-4 pt-3"
       style="padding-bottom: calc(env(safe-area-inset-bottom) + 12rpx)"
     >
-      <view class="flex w-full items-center justify-between px-4">
+      <view class="flex items-end justify-between px-2 mb-3">
+        <view>
+          <text class="text-xs text-gray-500">优惠</text>
+          <text class="text-xs text-primary ml-1"
+            >-￥{{ couponDiscount.toFixed(2) }}</text
+          >
+        </view>
+        <view>
+          <text class="text-xs text-gray-500">应付</text>
+          <text class="text-xl font-bold text-primary ml-1"
+            >￥{{ finalPayable }}</text
+          >
+        </view>
+      </view>
+      <view class="flex w-full items-center gap-3 px-1">
         <BaseButton
+          class="flex-1 action-btn"
           :loading="isSubmitting && currentAction === 'start'"
           :disabled="isSubmitting || (productDetail?.stock ?? 0) <= 0"
           text="发起拼团"
           @click="handleSubmitGroupBuy('start')"
         />
         <BaseButton
+          class="flex-1 action-btn"
           type="default"
           :loading="isSubmitting && currentAction === 'join'"
           :disabled="
@@ -433,3 +532,9 @@ onLoad(async (query) => {
     </view>
   </view>
 </template>
+
+<style scoped>
+.action-btn {
+  min-height: 80rpx;
+}
+</style>

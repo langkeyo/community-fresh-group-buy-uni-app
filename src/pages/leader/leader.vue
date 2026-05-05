@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import BaseButton from '@/components/base/BaseButton.vue'
+import BaseSmartImage from '@/components/base/BaseSmartImage.vue'
+import { DEFAULT_AVATAR_PATH } from '@/constants/ui'
 import { getPickPointDetail } from '@/services/pick-point'
 import { getLeaderWorkbench, leaderConfirmPick } from '@/services/order'
 import type { OrderInfo } from '@/types/order'
@@ -20,6 +22,13 @@ const pickedTodayCount = ref(0)
 
 const pendingCount = computed(() => pendingOrders.value.length)
 
+const resetWorkbenchState = () => {
+  errorMsg.value = ''
+  pendingOrders.value = []
+  recentConfirmList.value = []
+  pickedTodayCount.value = 0
+}
+
 const loadUserInfo = () => {
   const stored = uni.getStorageSync('userInfo')
   if (!stored) {
@@ -33,6 +42,9 @@ const loadPickPoint = async () => {
   const id = Number(uni.getStorageSync('default_pick_point_id'))
   if (!id) {
     pickPointId.value = null
+    pickPointName.value = ''
+    pickPointAddress.value = ''
+    resetWorkbenchState()
     return
   }
   pickPointId.value = id
@@ -90,7 +102,10 @@ onShow(async () => {
     return
   }
   await loadPickPoint()
-  if (!pickPointId.value) return
+  if (!pickPointId.value) {
+    uni.showToast({ title: '请先选择默认自提点', icon: 'none' })
+    return
+  }
   await loadLeaderOrders()
 })
 
@@ -100,9 +115,12 @@ onPullDownRefresh(async () => {
     return
   }
   await loadPickPoint()
-  if (pickPointId.value) {
-    await loadLeaderOrders()
+  if (!pickPointId.value) {
+    uni.showToast({ title: '请先选择默认自提点', icon: 'none' })
+    uni.stopPullDownRefresh()
+    return
   }
+  await loadLeaderOrders()
   uni.stopPullDownRefresh()
 })
 </script>
@@ -112,9 +130,12 @@ onPullDownRefresh(async () => {
     <!-- 头部卡片 -->
     <view class="bg-[#F08800] px-4 pt-4 pb-12 rounded-b-[40rpx]">
       <view class="flex items-center mb-6">
-        <image
-          src="https://placehold.co/100x100/FFFFFF/F08800?text=Avatar"
-          class="w-12 h-12 rounded-full border-2 border-white mr-3"
+        <BaseSmartImage
+          :src="userInfo?.avatar || DEFAULT_AVATAR_PATH"
+          class-name="w-12 h-12 rounded-full border-2 border-white mr-3 overflow-hidden"
+          fallback-bg="#ffffff"
+          fallback-color="#f08800"
+          fallback-text="团长"
         />
         <view>
           <text class="text-white font-bold text-lg block">{{

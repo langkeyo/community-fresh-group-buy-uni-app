@@ -1,17 +1,56 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { getPickPointDetail } from '@/services/pick-point'
+import { onShow } from '@dcloudio/uni-app'
+import { ref } from 'vue'
 
-const openLocation = () => {
-  uni.openLocation({
-    latitude: 39.909,
-    longitude: 116.397,
-    name: '阳光花园一期A站',
-    address: '阳光大道88号10栋101'
+const defaultPickName = ref('未设置默认自提点')
+const defaultPickAddress = ref('请先到自提网点页面设置默认自提点')
+const loading = ref(false)
+
+const loadDefaultPickPoint = async () => {
+  const id = Number(uni.getStorageSync('default_pick_point_id'))
+  if (!id) {
+    defaultPickName.value = '未设置默认自提点'
+    defaultPickAddress.value = '请先到自提网点页面设置默认自提点'
+    return
+  }
+
+  loading.value = true
+  try {
+    const detail = await getPickPointDetail(id)
+    defaultPickName.value = detail?.name || '未设置默认自提点'
+    defaultPickAddress.value =
+      detail?.address || '请先到自提网点页面设置默认自提点'
+  } catch (error: any) {
+    defaultPickName.value = '默认自提点加载失败'
+    defaultPickAddress.value = '请返回重试或重新选择自提点'
+  } finally {
+    loading.value = false
+  }
+}
+
+const goToPickPointPage = () => {
+  uni.navigateTo({ url: '/pages/self-pick/self-pick' })
+}
+
+const showAddressCapabilityTip = () => {
+  uni.showToast({
+    title: '收货地址管理暂未开通，请使用自提点',
+    icon: 'none'
   })
 }
 
-onMounted(() => {
-  // 预留动画或数据加载
+const copyPickAddress = () => {
+  const text = `${defaultPickName.value} ${defaultPickAddress.value}`.trim()
+  if (!text || defaultPickName.value === '未设置默认自提点') {
+    uni.showToast({ title: '请先设置默认自提点', icon: 'none' })
+    return
+  }
+  uni.setClipboardData({ data: text })
+}
+
+onShow(() => {
+  loadDefaultPickPoint()
 })
 </script>
 
@@ -19,21 +58,40 @@ onMounted(() => {
   <view class="min-h-screen bg-gray-50 p-6 space-y-6">
     <view class="bg-white rounded-xl p-6 shadow-sm">
       <text class="text-lg font-bold text-fresh block mb-3">默认收货地址</text>
-      <text class="text-base text-gray-700 block">张同学  138****8000</text>
-      <text class="text-sm text-gray-500 block mt-2">上海市 浦东新区 碧波路100号 2栋1102</text>
+      <text class="text-base text-gray-700 block">能力状态：LIMITED</text>
+      <text class="text-sm text-gray-500 block mt-2"
+        >当前版本仅支持自提点，不支持到家收货地址管理</text
+      >
       <view class="mt-4 flex gap-3">
-        <view class="px-4 py-2 text-sm rounded-full border border-primary text-primary">设为默认</view>
-        <view class="px-4 py-2 text-sm rounded-full border border-gray-200 text-gray-600">编辑</view>
+        <view
+          class="px-4 py-2 text-sm rounded-full border border-primary text-primary"
+          @click="showAddressCapabilityTip"
+          >设为默认</view
+        >
+        <view
+          class="px-4 py-2 text-sm rounded-full border border-gray-200 text-gray-600"
+          @click="showAddressCapabilityTip"
+          >编辑</view
+        >
       </view>
     </view>
 
     <view class="bg-white rounded-xl p-6 shadow-sm">
       <text class="text-lg font-bold text-fresh block mb-3">常用自提点</text>
-      <text class="text-base text-gray-700 block">阳光花园一期A站</text>
-      <text class="text-sm text-gray-500 block mt-2">阳光大道88号10栋101</text>
+      <text class="text-base text-gray-700 block">{{ defaultPickName }}</text>
+      <text class="text-sm text-gray-500 block mt-2">{{ defaultPickAddress }}</text>
+      <text v-if="loading" class="text-xs text-gray-400 block mt-2">加载中...</text>
       <view class="mt-4 flex gap-3">
-        <view class="px-4 py-2 text-sm rounded-full border border-primary text-primary" @click="openLocation">一键导航</view>
-        <view class="px-4 py-2 text-sm rounded-full border border-gray-200 text-gray-600">切换自提点</view>
+        <view
+          class="px-4 py-2 text-sm rounded-full border border-primary text-primary"
+          @click="copyPickAddress"
+          >复制地址</view
+        >
+        <view
+          class="px-4 py-2 text-sm rounded-full border border-gray-200 text-gray-600"
+          @click="goToPickPointPage"
+          >切换自提点</view
+        >
       </view>
     </view>
 

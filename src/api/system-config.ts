@@ -17,6 +17,16 @@ export interface SystemConfigResp {
     enabled: boolean
     sort: number
   }[]
+  extendedSettings?: {
+    homeBanners?: {
+      title: string
+      imageUrl: string
+      productId: number
+      enabled: boolean
+      sort: number
+      badgeText?: string
+    }[]
+  }
 }
 
 export const getSystemConfigApi = () => {

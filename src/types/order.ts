@@ -7,6 +7,10 @@ export interface OrderInfo {
   name: string
   qty: number
   price: string
+  couponId?: string
+  couponTitle?: string
+  couponAmount?: string
+  remark?: string
   pickPointName: string
   pickPointAddress: string
   status: OrderStatus

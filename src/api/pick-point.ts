@@ -5,6 +5,8 @@ export interface PickPointItemResp {
   id: number
   name: string
   address: string
+  latitude?: number | null
+  longitude?: number | null
 }
 
 export const getPickPointListApi = (keyword?: string) => {

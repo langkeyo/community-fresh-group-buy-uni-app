@@ -1,6 +1,10 @@
 import { getSystemConfigApi } from '@/api/system-config'
 import { systemConfigSchema } from '@/schemas/system-config'
-import type { RecommendMenuItem, SystemConfig } from '@/types/system-config'
+import type {
+  HomeBannerItem,
+  RecommendMenuItem,
+  SystemConfig
+} from '@/types/system-config'
 
 const defaultRecommendMenus: RecommendMenuItem[] = [
   {
@@ -51,7 +55,8 @@ const fallbackConfig: SystemConfig = {
   serviceWechat: 'ligo-service',
   serviceHours: '09:00-22:00',
   serviceTerms: '服务条款：当前版本为毕业设计演示环境，支付流程为模拟链路。',
-  recommendMenus: defaultRecommendMenus
+  recommendMenus: defaultRecommendMenus,
+  homeBanners: []
 }
 
 function normalizeMenus(raw: RecommendMenuItem[]): RecommendMenuItem[] {
@@ -59,6 +64,12 @@ function normalizeMenus(raw: RecommendMenuItem[]): RecommendMenuItem[] {
     .filter((item) => item.enabled !== false && item.name && item.value)
     .sort((a, b) => (a.sort || 999) - (b.sort || 999))
   return list.length ? list : defaultRecommendMenus
+}
+
+function normalizeHomeBanners(raw: HomeBannerItem[]): HomeBannerItem[] {
+  return (raw || [])
+    .filter((item) => item.enabled !== false && Number(item.productId) > 0)
+    .sort((a, b) => (a.sort || 999) - (b.sort || 999))
 }
 
 export async function getSystemConfig(): Promise<SystemConfig> {
@@ -71,7 +82,10 @@ export async function getSystemConfig(): Promise<SystemConfig> {
     return {
       ...fallbackConfig,
       ...parsed.data,
-      recommendMenus: normalizeMenus(parsed.data.recommendMenus || [])
+      recommendMenus: normalizeMenus(parsed.data.recommendMenus || []),
+      homeBanners: normalizeHomeBanners(
+        parsed.data.extendedSettings?.homeBanners || []
+      )
     }
   } catch (error) {
     return fallbackConfig

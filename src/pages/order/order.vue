@@ -64,15 +64,21 @@ function getStatusKind(status: number) {
 }
 
 async function loadOrderList() {
+  if (!userStore.userId) {
+    orderList.value = []
+    errorMsg.value = '请先登录后查看订单'
+    hasLoaded.value = true
+    loading.value = false
+    return
+  }
+
   loading.value = true
   errorMsg.value = ''
 
   try {
     orderList.value = await getOrderList(userStore.userId)
-    console.log(orderList.value)
     hasLoaded.value = true
   } catch (error) {
-    console.log(error)
     errorMsg.value = '订单加载失败，请稍后重试'
   } finally {
     loading.value = false

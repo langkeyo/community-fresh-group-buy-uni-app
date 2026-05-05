@@ -11,11 +11,26 @@ const recommendMenuItemSchema = z.object({
   sort: z.coerce.number().default(999)
 })
 
+const homeBannerItemSchema = z.object({
+  title: z.string().default(''),
+  imageUrl: z.string().default(''),
+  productId: z.coerce.number().default(0),
+  enabled: z.boolean().default(true),
+  sort: z.coerce.number().default(999),
+  badgeText: z.string().optional().default('')
+})
+
 export const systemConfigSchema = z.object({
   noticeText: z.string().default(''),
   servicePhone: z.string().default(''),
   serviceWechat: z.string().default(''),
   serviceHours: z.string().default(''),
   serviceTerms: z.string().default(''),
-  recommendMenus: z.array(recommendMenuItemSchema).default([])
+  recommendMenus: z.array(recommendMenuItemSchema).default([]),
+  extendedSettings: z
+    .object({
+      homeBanners: z.array(homeBannerItemSchema).default([])
+    })
+    .optional()
+    .default({ homeBanners: [] })
 })

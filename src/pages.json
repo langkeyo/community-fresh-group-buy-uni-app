@@ -21,6 +21,38 @@
       }
     },
     {
+      "path": "pages/search/search",
+      "style": {
+        "navigationBarTitleText": "搜索商品",
+        "navigationBarBackgroundColor": "#F08800",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/notice/notice",
+      "style": {
+        "navigationBarTitleText": "通知中心",
+        "navigationBarBackgroundColor": "#F08800",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/settings/settings",
+      "style": {
+        "navigationBarTitleText": "设置",
+        "navigationBarBackgroundColor": "#F08800",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/account-security/account-security",
+      "style": {
+        "navigationBarTitleText": "账号与安全",
+        "navigationBarBackgroundColor": "#F08800",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
       "path": "pages/goods/detail",
       "style": {
         "navigationBarTitleText": "商品详情",

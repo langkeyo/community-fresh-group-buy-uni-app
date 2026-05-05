@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import BaseButton from '@/components/base/BaseButton.vue'
+import BaseSmartImage from '@/components/base/BaseSmartImage.vue'
 import BaseTag from '@/components/base/BaseTag.vue'
 import { getAiRecipeRecommend } from '@/services/ai'
 import type { AiRecipeHistoryItem, FavoriteItem } from '@/types/ai'
@@ -285,10 +286,12 @@ loadFavorites()
         <view
           class="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100"
         >
-          <image
+          <BaseSmartImage
             :src="card.image"
-            mode="aspectFill"
-            class="w-full h-40 bg-gray-200"
+            class-name="w-full h-40 bg-gray-200"
+            fallback-bg="#eef2f7"
+            fallback-color="#667085"
+            :fallback-text="card.title || '食谱图片'"
           />
 
           <view class="p-4">
