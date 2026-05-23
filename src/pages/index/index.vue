@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getUserList } from '@/api/user'
+import { getUserInfo, getUserList } from '@/api/user'
 import BaseSmartImage from '@/components/base/BaseSmartImage.vue'
 import { DEFAULT_AVATAR_PATH } from '@/constants/ui'
 import { getNoticeList } from '@/services/notice'
@@ -8,6 +8,7 @@ import { getProductList } from '@/services/product'
 import { getSystemConfig } from '@/services/system-config'
 import type { RecommendMenuItem } from '@/types/system-config'
 import { resolveAvatarUrl } from '@/utils/avatar'
+import { isLeaderUser } from '@/utils/leader'
 import { onShow } from '@dcloudio/uni-app'
 import { ref } from 'vue'
 
@@ -137,7 +138,7 @@ async function loadHomeData() {
     })
 
     const usersRes = await getUserList()
-    const leaders = (usersRes.data || []).filter((u) => Boolean(u?.isLeader))
+    const leaders = (usersRes.data || []).filter((u) => isLeaderUser(u?.isLeader))
     leaderList.value = leaders.slice(0, 1).map((item) => ({
       id: item.id,
       name: item.nickname || `团长#${item.id}`,
@@ -147,23 +148,35 @@ async function loadHomeData() {
     }))
 
     const stored = uni.getStorageSync('userInfo')
-    const userInfo = stored
+    let userInfo = stored
       ? typeof stored === 'string'
         ? JSON.parse(stored)
         : stored
       : null
+    let userId = Number(userInfo?.id || 0)
+    if (userId > 0) {
+      try {
+        const latest = await getUserInfo()
+        if ((latest.code === 0 || latest.code === 200) && latest.data) {
+          userInfo = latest.data
+          uni.setStorageSync('userInfo', latest.data)
+          userId = Number(latest.data.id || 0)
+        }
+      } catch {
+        // ignore user profile refresh failure
+      }
+    }
     currentUserInfo.value = userInfo
-    const userId = Number(userInfo?.id || 0)
     if (userId > 0) {
       const notices = await getNoticeList(userId)
       noticeUnreadCount.value = notices.filter((item) => !item.read).length
       try {
         const orders = await getOrderList(userId)
         pendingGroupCount.value = orders.filter((x) => x.status === 1).length
-        pendingPickupCount.value = orders.filter((x) => x.status === 2).length
+        pendingPickupCount.value = orders.filter((x) => x.status === 2 || x.status === 4).length
         syncOrderTabBadge(pendingGroupCount.value + pendingPickupCount.value)
         const latest = orders
-          .filter((x) => x.status === 1 || x.status === 2)
+          .filter((x) => x.status === 1 || x.status === 2 || x.status === 4)
           .sort((a, b) => {
             const ta = parseTime(a.createTime)?.getTime() || 0
             const tb = parseTime(b.createTime)?.getTime() || 0
@@ -172,12 +185,14 @@ async function loadHomeData() {
         if (latest) {
           if (latest.status === 1) {
             homeOrderTip.value = '待成团订单将在成团后约2小时内可提货，请留意订单通知'
-          } else {
+          } else if (latest.status === 2) {
             const hour = parseTime(latest.createTime)?.getHours() ?? 9
             homeOrderTip.value =
               hour < 12
                 ? '该订单预计今日18:00后可提货，请关注订单详情提醒'
                 : '该订单预计次日10:00后可提货，请关注订单详情提醒'
+          } else {
+            homeOrderTip.value = '团长已核销，请尽快在订单详情确认收货'
           }
         }
       } catch {
@@ -303,12 +318,12 @@ function goToProductDetail(productId: number) {
 }
 
 function goToLeaderEntry() {
-  if (!ensureLogin('进入团长入口')) return
-  if (currentUserInfo.value?.isLeader) {
-    uni.navigateTo({ url: '/pages/leader/leader' })
+  if (!ensureLogin('进入团长工作台')) return
+  if (!isLeaderUser(currentUserInfo.value?.isLeader)) {
+    uni.showToast({ title: '仅团长可进入工作台', icon: 'none' })
     return
   }
-  uni.navigateTo({ url: '/pages/mine/mine' })
+  uni.navigateTo({ url: '/pages/leader/leader' })
 }
 </script>
 
@@ -511,46 +526,10 @@ function goToLeaderEntry() {
       </view>
     </view>
 
-    <!-- 团长模块 -->
-    <view class="section-card p-4 space-y-2" v-if="leaderList.length">
+    <!-- 团长模块（仅团长可见） -->
+    <view class="section-card p-4 space-y-2" v-if="isLeaderUser(currentUserInfo?.isLeader)">
       <view class="flex items-center justify-between">
-        <text class="text-base font-bold text-fresh">今日明星团长</text>
-        <text class="text-xs text-primary" @click="goToLeaderEntry">
-          {{ currentUserInfo?.isLeader ? '进入团长工作台' : '查看团长入口' }}
-        </text>
-      </view>
-
-      <view
-        class="bg-secondary rounded-lg p-4 flex items-center gap-4 active:opacity-90"
-        @click="goToLeaderEntry"
-      >
-        <BaseSmartImage
-          :src="leaderList[0].avatar"
-          class-name="w-14 h-14 rounded-full border border-white/80 overflow-hidden bg-white"
-          fallback-bg="#fff7ed"
-          fallback-color="#f08800"
-          fallback-text="团长"
-        />
-        <view class="flex-1">
-          <text class="block text-sm font-bold text-fresh">{{
-            leaderList[0].name
-          }}</text>
-          <text class="block text-xs text-gray-500">{{
-            leaderList[0].community
-          }}</text>
-        </view>
-        <view class="text-right">
-          <text class="block text-xs text-gray-600"
-            >{{ leaderList[0].membersLabel }}</text
-          >
-          <text class="block text-[20rpx] text-primary mt-1">可点击查看</text>
-        </view>
-      </view>
-    </view>
-
-    <view class="section-card p-4 space-y-2" v-else>
-      <view class="flex items-center justify-between">
-        <text class="text-base font-bold text-fresh">团长入口</text>
+        <text class="text-base font-bold text-fresh">团长工作台</text>
         <text class="text-xs text-gray-500">订单核销与管理都在团长工作台</text>
       </view>
       <view
@@ -558,14 +537,10 @@ function goToLeaderEntry() {
         @click="goToLeaderEntry"
       >
         <view>
-          <text class="block text-sm font-bold text-[#2F5233]">
-            {{ currentUserInfo?.isLeader ? '进入团长工作台' : '申请成为团长' }}
-          </text>
-          <text class="block text-xs text-gray-500 mt-1">
-            {{ currentUserInfo?.isLeader ? '核销、查看待办、回看最近核销' : '当前账号未开通团长权限，可前往“我的”页提交申请' }}
-          </text>
+          <text class="block text-sm font-bold text-[#2F5233]">进入团长工作台</text>
+          <text class="block text-xs text-gray-500 mt-1">核销、查看待办、回看最近核销</text>
         </view>
-        <text class="text-xs text-primary">{{ currentUserInfo?.isLeader ? '去查看' : '去申请' }}</text>
+        <text class="text-xs text-primary">去查看</text>
       </view>
     </view>
 

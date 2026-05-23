@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { getNoticeList, markNoticeRead } from '@/services/notice'
 import type { NoticeItem } from '@/types/notice'
+import { notifyInfo, notifySuccess } from '@/utils/notify'
 import { onShow } from '@dcloudio/uni-app'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 const list = ref<NoticeItem[]>([])
 const loading = ref(false)
 const errorMsg = ref('')
+const filter = ref<'all' | 'unread'>('all')
 const NOTICE_REFRESH_KEY = 'notice_need_refresh'
+const unreadCount = computed(() => list.value.filter((x) => !x.read).length)
+const displayList = computed(() =>
+  filter.value === 'unread' ? list.value.filter((x) => !x.read) : list.value
+)
 
 function getCurrentUserId(): number {
   const stored = uni.getStorageSync('userInfo')
@@ -56,6 +62,22 @@ async function openNotice(item: NoticeItem) {
   })
 }
 
+async function markAllRead() {
+  const userId = getCurrentUserId()
+  if (!userId) return
+  const unread = list.value.filter((x) => !x.read)
+  if (!unread.length) {
+    notifyInfo('已全部已读')
+    return
+  }
+  await Promise.all(unread.map((item) => markNoticeRead(item.id, userId).catch(() => null)))
+  unread.forEach((item) => {
+    item.read = true
+  })
+  uni.setStorageSync(NOTICE_REFRESH_KEY, true)
+  notifySuccess('已全部标记为已读')
+}
+
 onShow(() => {
   loadData()
 })
@@ -65,7 +87,27 @@ onShow(() => {
   <view class="min-h-screen bg-gray-50 px-4 pt-4">
     <view class="mb-3 flex items-center justify-between">
       <text class="text-base font-bold text-fresh">通知中心</text>
-      <text class="text-xs text-gray-400">点击可标记已读</text>
+      <view class="flex items-center gap-3">
+        <text class="text-xs text-gray-400">未读 {{ unreadCount }}</text>
+        <text class="text-xs text-primary" @click="markAllRead">全部已读</text>
+      </view>
+    </view>
+
+    <view class="mb-3 flex items-center gap-2">
+      <view
+        class="px-3 py-1 text-xs rounded-full border"
+        :class="filter === 'all' ? 'bg-[#2F5233] text-white border-[#2F5233]' : 'bg-white border-gray-200 text-gray-600'"
+        @click="filter = 'all'"
+      >
+        全部
+      </view>
+      <view
+        class="px-3 py-1 text-xs rounded-full border"
+        :class="filter === 'unread' ? 'bg-[#2F5233] text-white border-[#2F5233]' : 'bg-white border-gray-200 text-gray-600'"
+        @click="filter = 'unread'"
+      >
+        仅未读
+      </view>
     </view>
 
     <view v-if="loading" class="py-8 text-center">
@@ -84,13 +126,13 @@ onShow(() => {
       </view>
     </view>
 
-    <view v-else-if="!list.length" class="py-8 text-center">
-      <text class="text-sm text-gray-400">暂无通知</text>
+    <view v-else-if="!displayList.length" class="py-8 text-center">
+      <text class="text-sm text-gray-400">{{ filter === 'unread' ? '暂无未读通知' : '暂无通知' }}</text>
     </view>
 
     <view v-else class="space-y-3">
       <view
-        v-for="item in list"
+        v-for="item in displayList"
         :key="item.id"
         class="bg-white rounded-lg p-4 shadow-sm"
         @click="openNotice(item)"

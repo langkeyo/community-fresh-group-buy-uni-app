@@ -4,6 +4,7 @@ import { DEFAULT_AVATAR_PATH } from '@/constants/ui'
 import { getNoticeList } from '@/services/notice'
 import { getSystemConfig } from '@/services/system-config'
 import { useUserStore } from '@/stores/user'
+import { isSoundEnabled, playNoticeSound, setSoundEnabled } from '@/utils/sound'
 import { onShow } from '@dcloudio/uni-app'
 import { ref } from 'vue'
 
@@ -13,10 +14,11 @@ const unreadCount = ref(0)
 const servicePhone = ref('400-800-1234')
 const serviceWechat = ref('ligo-service')
 const loading = ref(false)
+const soundEnabled = ref(true)
 const avatarLoadFailed = ref(false)
 const userStore = useUserStore()
 const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8080'
+  (import.meta.env.VITE_API_BASE_URL as string) || 'https://localhost:8080'
 
 function toAbsoluteUrl(url: string): string {
   if (!url) return ''
@@ -53,6 +55,7 @@ function ensureLogin(actionText = '操作'): boolean {
 }
 
 async function loadData() {
+  soundEnabled.value = isSoundEnabled()
   if (!ensureLogin('查看设置')) return
   loading.value = true
   try {
@@ -94,6 +97,15 @@ async function loadData() {
   } catch (error) {
   } finally {
     loading.value = false
+  }
+}
+
+function onToggleSound(event: any) {
+  const next = Boolean(event?.detail?.value)
+  soundEnabled.value = next
+  setSoundEnabled(next)
+  if (next) {
+    playNoticeSound()
   }
 }
 
@@ -216,6 +228,21 @@ function onAvatarError() {
           <text class="row-label">账号与安全</text>
         </view>
         <uni-icons type="right" size="16" color="#c4c4c4" />
+      </view>
+    </view>
+
+    <view class="settings-card">
+      <view class="setting-row no-border">
+        <view class="row-left">
+          <uni-icons type="notification" size="18" color="#2f5233" />
+          <text class="row-label">通知提示音</text>
+        </view>
+        <switch
+          :checked="soundEnabled"
+          color="#2f5233"
+          style="transform: scale(0.9)"
+          @change="onToggleSound"
+        />
       </view>
     </view>
 

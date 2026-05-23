@@ -36,10 +36,9 @@ const imageList = computed(() => {
 const videoUrl = computed(() => product.value?.videoUrl || '')
 
 const displayCommentList = computed(() => {
-  if (reviewTextList.value.length) return reviewTextList.value
-  const name = product.value?.name || '该商品'
-  return [`系统：${name} 暂无真实评价，欢迎首评`, `系统：下单后可在后续版本评价`]
+  return reviewTextList.value
 })
+const hasComments = computed(() => displayCommentList.value.length > 0)
 
 const goToGroupBuy = (joinGroupId?: string) => {
   const pickPointId = Number(uni.getStorageSync('default_pick_point_id'))
@@ -213,6 +212,7 @@ onPullDownRefresh(async () => {
             <text class="text-base font-bold text-fresh">买家评价</text>
           </view>
           <swiper
+            v-if="hasComments"
             class="comment-swiper"
             vertical
             autoplay
@@ -224,6 +224,13 @@ onPullDownRefresh(async () => {
               <text class="text-sm text-gray-600 line-clamp-1">{{ item }}</text>
             </swiper-item>
           </swiper>
+          <view v-else class="comment-empty">
+            <view class="comment-empty-icon">
+              <uni-icons type="staff-filled" size="22" color="#94a3b8" />
+            </view>
+            <text class="text-sm text-gray-500 mt-2 block">暂无评论</text>
+            <text class="text-xs text-gray-400 mt-1 block">等你来成为第一个评论的人</text>
+          </view>
           <view class="mt-3 pt-3 border-t border-gray-100">
             <text class="text-xs text-gray-400">请在订单详情页完成收货后进行评价</text>
           </view>
@@ -281,6 +288,24 @@ onPullDownRefresh(async () => {
 .comment-item {
   display: flex;
   align-items: center;
+}
+
+.comment-empty {
+  min-height: 120rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.comment-empty-icon {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 9999rpx;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .detail-cta-btn :deep(view) {

@@ -9,6 +9,8 @@ export interface UserInfo {
   avatar: string
   mobile: string
   isLeader: boolean
+  realnameStatus?: 'none' | 'pending' | 'approved' | 'rejected'
+  leaderApplyStatus?: 'none' | 'pending' | 'approved' | 'rejected'
   createTime: string
   updateTime: string
 }
@@ -22,6 +24,27 @@ export interface UpdateProfileReq {
   nickname?: string
   avatar?: string
   mobile?: string
+}
+
+export interface RealnameSubmitReq {
+  authType: 'personal' | 'company'
+  realName: string
+  idCardNo?: string
+  companyName?: string
+  licenseNo?: string
+  contactPhone?: string
+  idCardFrontUrl?: string
+  idCardBackUrl?: string
+  faceVerifyUrl?: string
+  businessLicenseUrl?: string
+}
+
+export interface LeaderApplySubmitReq {
+  applyType: 'leader' | 'bind_pick_point'
+  contactName: string
+  contactPhone: string
+  communityName: string
+  remark?: string
 }
 
 // --- 接口定义 (修复重点) ---
@@ -62,4 +85,20 @@ export const updateUserProfile = (data: UpdateProfileReq) => {
   return http.put<Result<UserInfo>>('/api/user/profile', data) as unknown as Promise<
     Result<UserInfo>
   >
+}
+
+export const getCurrentRealnameAuth = () => {
+  return http.get<Result<any>>('/api/user/realname/current') as unknown as Promise<Result<any>>
+}
+
+export const submitRealnameAuth = (data: RealnameSubmitReq) => {
+  return http.post<Result<string>>('/api/user/realname/submit', data) as unknown as Promise<Result<string>>
+}
+
+export const getLatestLeaderApply = (applyType: 'leader' | 'bind_pick_point') => {
+  return http.get<Result<any>>('/api/leader/apply/latest', { params: { applyType } }) as unknown as Promise<Result<any>>
+}
+
+export const submitLeaderApply = (data: LeaderApplySubmitReq) => {
+  return http.post<Result<string>>('/api/leader/apply/submit', data) as unknown as Promise<Result<string>>
 }

@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import BaseSmartImage from '@/components/base/BaseSmartImage.vue'
 import { getUserInfo } from '@/api/user' // 引入咱们封装好的接口
 import { getLeaderWorkbench } from '@/services/order'
+import { getPickPointList } from '@/services/pick-point'
 import { useUserStore } from '@/stores/user'
 import type { UserInfo } from '@/types/user' // 引入类型定义
 import { DEFAULT_AVATAR_PATH } from '@/constants/ui'
 import { resolveAvatarUrl } from '@/utils/avatar'
+import { isLeaderUser } from '@/utils/leader'
 import { onShow } from '@dcloudio/uni-app' // 生命周期钩子
 
 // --- 状态定义 ---
@@ -14,8 +16,42 @@ const isLogin = ref(false)
 const userInfo = ref<UserInfo | null>(null)
 const leaderSummaryText = ref('进入工作台查看待核销订单')
 const userStore = useUserStore()
-const LEADER_APPLY_KEY = 'leader_apply_draft'
 const hasPendingLeaderApply = ref(false)
+const realnameStatus = ref<'none' | 'pending' | 'approved' | 'rejected'>('none')
+const leaderApplyStatus = ref<'none' | 'pending' | 'approved' | 'rejected'>('none')
+const hasLeaderRole = computed(() => isLeaderUser(userInfo.value?.isLeader))
+const avatarRole = computed<'guest' | 'member' | 'leader' | 'admin'>(() => {
+  if (!isLogin.value) return 'guest'
+  const role = String(userInfo.value?.adminRole || '').toLowerCase()
+  if (role === 'super_admin' || role === 'ops_admin' || role === 'cs_agent') return 'admin'
+  if (hasLeaderRole.value) return 'leader'
+  return 'member'
+})
+const avatarFrameClass = computed(() => {
+  if (avatarRole.value === 'admin') return 'avatar-frame avatar-frame-admin'
+  if (avatarRole.value === 'leader') return 'avatar-frame avatar-frame-leader'
+  if (avatarRole.value === 'member') return 'avatar-frame avatar-frame-member'
+  return 'avatar-frame avatar-frame-guest'
+})
+const avatarBadgeText = computed(() => {
+  if (avatarRole.value === 'admin') return '管'
+  if (avatarRole.value === 'leader') return '团'
+  if (avatarRole.value === 'member') return '会'
+  return '客'
+})
+const showAvatarBadge = computed(() => isLogin.value)
+const avatarBadgeMode = computed<'leader' | 'verified' | 'admin' | 'member'>(() => {
+  if (avatarRole.value === 'leader') return 'leader'
+  if (avatarRole.value === 'admin') return 'admin'
+  if (realnameStatus.value === 'approved') return 'verified'
+  return 'member'
+})
+const avatarBadgeClass = computed(() => {
+  if (avatarBadgeMode.value === 'leader') return 'avatar-role-badge avatar-role-badge-leader'
+  if (avatarBadgeMode.value === 'verified') return 'avatar-role-badge avatar-role-badge-verified'
+  if (avatarBadgeMode.value === 'admin') return 'avatar-role-badge avatar-role-badge-admin'
+  return 'avatar-role-badge avatar-role-badge-member'
+})
 
 // 默认的工具栏数据
 const tools = [
@@ -64,8 +100,9 @@ const checkLoginStatus = () => {
 }
 
 const refreshLeaderApplyStatus = () => {
-  const raw = uni.getStorageSync(LEADER_APPLY_KEY)
-  hasPendingLeaderApply.value = Boolean(raw && typeof raw === 'object' && raw.submitAt)
+  hasPendingLeaderApply.value = userInfo.value?.leaderApplyStatus === 'pending'
+  leaderApplyStatus.value = (userInfo.value?.leaderApplyStatus as any) || 'none'
+  realnameStatus.value = (userInfo.value?.realnameStatus as any) || 'none'
 }
 
 const handleLogin = () => {
@@ -98,18 +135,29 @@ const updateLocalUser = (user: UserInfo) => {
   userInfo.value = user
   uni.setStorageSync('userInfo', user)
   userStore.setUserId(Number(user.id))
+  realnameStatus.value = (user.realnameStatus as any) || 'none'
+  hasPendingLeaderApply.value = user.leaderApplyStatus === 'pending'
+  leaderApplyStatus.value = (user.leaderApplyStatus as any) || 'none'
   loadLeaderSummary()
 }
 
 const loadLeaderSummary = async () => {
-  if (!isLogin.value || !userInfo.value?.isLeader || !userInfo.value?.id) {
+  if (!isLogin.value || !hasLeaderRole.value || !userInfo.value?.id) {
     leaderSummaryText.value = '进入工作台查看待核销订单'
     return
   }
 
+  const points = await getPickPointList().catch(() => [])
+  const managedPoints = points.filter((p) => Number(p.leaderUserId || 0) === Number(userInfo.value?.id || 0))
+  if (!managedPoints.length) {
+    leaderSummaryText.value = '暂无可管理站点，点击进入可申请绑定'
+    return
+  }
+
   const pickPointId = Number(uni.getStorageSync('default_pick_point_id'))
-  if (!pickPointId) {
-    leaderSummaryText.value = '请先选择默认自提点'
+  const canManageDefault = managedPoints.some((p) => Number(p.id) === pickPointId)
+  if (!pickPointId || !canManageDefault) {
+    leaderSummaryText.value = '请先进入工作台选择你可管理的站点'
     return
   }
 
@@ -117,19 +165,32 @@ const loadLeaderSummary = async () => {
     const data = await getLeaderWorkbench(userInfo.value.id, pickPointId)
     leaderSummaryText.value = `今日核销 ${data.pickedTodayCount} | 待核销 ${data.pendingCount}`
   } catch (error: any) {
-    leaderSummaryText.value = '工作台数据加载失败，点击重试'
+    leaderSummaryText.value = '进入工作台查看站点与订单'
   }
 }
 
 // --- 页面跳转逻辑 ---
 
 const goToLeader = () => {
+  if (!isLogin.value) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    return
+  }
+  if (!hasLeaderRole.value) {
+    uni.showToast({ title: '仅团长可进入工作台', icon: 'none' })
+    return
+  }
   uni.navigateTo({ url: '/pages/leader/leader' })
 }
 
 const applyLeader = () => {
   if (hasPendingLeaderApply.value) {
     uni.showToast({ title: '已提交申请，请等待管理员审核', icon: 'none' })
+    return
+  }
+  if (realnameStatus.value !== 'approved') {
+    uni.showToast({ title: '请先完成实名认证', icon: 'none' })
+    uni.navigateTo({ url: '/pages/realname/auth' })
     return
   }
   uni.navigateTo({ url: '/pages/leader/apply' })
@@ -240,13 +301,23 @@ const handleToolClick = (route: string) => {
       <!-- 登录/用户信息区域 -->
       <view class="flex items-center" @click="handleLogin">
         <!-- 头像：已登录显示头像，未登录显示默认 -->
-        <BaseSmartImage
-          :src="userInfo?.avatar || DEFAULT_AVATAR_PATH"
-          class-name="w-16 h-16 rounded-full border-2 border-white bg-white mr-4 overflow-hidden"
-          fallback-bg="#ffffff"
-          fallback-color="#2f5233"
-          fallback-text="头像"
-        />
+        <view class="relative mr-4">
+          <view :class="avatarFrameClass">
+            <BaseSmartImage
+              :src="userInfo?.avatar || DEFAULT_AVATAR_PATH"
+              class-name="w-16 h-16 rounded-full bg-white overflow-hidden"
+              fallback-bg="#ffffff"
+              fallback-color="#2f5233"
+              fallback-text="头像"
+            />
+          </view>
+          <view v-if="showAvatarBadge" :class="avatarBadgeClass">
+            <uni-icons v-if="avatarBadgeMode === 'leader'" type="shop" size="14" color="#8a5a00" />
+            <uni-icons v-else-if="avatarBadgeMode === 'verified'" type="checkmarkempty" size="14" color="#ffffff" />
+            <uni-icons v-else-if="avatarBadgeMode === 'admin'" type="gear-filled" size="14" color="#ffffff" />
+            <text v-else>{{ avatarBadgeText }}</text>
+          </view>
+        </view>
 
         <view class="flex flex-col text-white">
           <!-- 昵称 -->
@@ -267,7 +338,7 @@ const handleToolClick = (route: string) => {
             <text class="text-xs opacity-90">
               {{
                 isLogin
-                  ? userInfo?.isLeader
+                  ? hasLeaderRole
                     ? '🏅 金牌团长'
                     : '🥬 普通会员'
                   : '登录立享优惠'
@@ -282,7 +353,7 @@ const handleToolClick = (route: string) => {
     <view class="mx-4 mb-4">
       <!-- 已经是团长 -->
       <view
-        v-if="isLogin && userInfo?.isLeader"
+        v-if="isLogin && hasLeaderRole"
         class="bg-gradient-to-r from-[#2F5233] to-[#4a7c50] rounded-xl p-4 flex justify-between items-center text-white shadow-lg active:opacity-90 transition-opacity"
         @click="goToLeader"
       >
@@ -346,10 +417,10 @@ const handleToolClick = (route: string) => {
           ></uni-icons>
           <view>
             <text class="font-bold text-[#2F5233] text-lg block"
-              >{{ hasPendingLeaderApply ? '团长申请审核中' : '申请团长权限' }}</text
+              >{{ hasPendingLeaderApply ? '团长申请审核中' : (leaderApplyStatus === 'rejected' ? '申请未通过，去修改' : '申请团长权限') }}</text
             >
             <text class="text-xs text-gray-500">{{
-              hasPendingLeaderApply ? '请耐心等待审核结果' : '管理员审核后开通'
+              hasPendingLeaderApply ? '请耐心等待审核结果' : (leaderApplyStatus === 'rejected' ? '根据驳回原因完善资料后重新提交' : '管理员审核后开通')
             }}</text>
           </view>
         </view>
@@ -357,7 +428,7 @@ const handleToolClick = (route: string) => {
           class="bg-[#2F5233] text-white px-3 py-1.5 rounded-full text-xs flex items-center"
           :class="{ 'opacity-70': hasPendingLeaderApply }"
         >
-          {{ hasPendingLeaderApply ? '审核中' : '去申请' }}
+          {{ hasPendingLeaderApply ? '审核中' : (leaderApplyStatus === 'rejected' ? '去修改' : '去申请') }}
           <uni-icons
             type="arrowright"
             size="12"
@@ -439,5 +510,59 @@ const handleToolClick = (route: string) => {
 .tool-name {
   font-size: 30rpx;
   color: #2f5233;
+}
+
+.avatar-frame {
+  border-radius: 9999rpx;
+  padding: 4rpx;
+}
+
+.avatar-frame-guest {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.avatar-frame-member {
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+}
+
+.avatar-frame-leader {
+  background: linear-gradient(135deg, #fde68a, #f59e0b);
+}
+
+.avatar-frame-admin {
+  background: linear-gradient(135deg, #fecaca, #ef4444);
+}
+
+.avatar-role-badge {
+  position: absolute;
+  right: -4rpx;
+  bottom: -4rpx;
+  width: 30rpx;
+  height: 30rpx;
+  border-radius: 9999rpx;
+  color: #fff;
+  font-size: 18rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx solid #fff;
+}
+
+.avatar-role-badge-leader {
+  background: linear-gradient(135deg, #fff3c4, #f6c44f);
+  border: 2rpx solid #fff7d6;
+  box-shadow: 0 2rpx 8rpx rgba(246, 196, 79, 0.45);
+}
+
+.avatar-role-badge-verified {
+  background: #16a34a;
+}
+
+.avatar-role-badge-admin {
+  background: #b91c1c;
+}
+
+.avatar-role-badge-member {
+  background: #0f172a;
 }
 </style>

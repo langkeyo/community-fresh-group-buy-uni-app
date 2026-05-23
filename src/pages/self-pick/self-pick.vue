@@ -6,6 +6,7 @@ import { buildTencentMapMarkerUrl, geocodeByTencentMap } from '@/services/map'
 import { getPickPointList } from '@/services/pick-point'
 import { getSystemConfig } from '@/services/system-config'
 import type { PickPointItem } from '@/types/pick-point'
+import { notifyError, notifyInfo, notifySuccess } from '@/utils/notify'
 import { ref, computed, onMounted } from 'vue'
 import { onReady } from '@dcloudio/uni-app'
 
@@ -21,6 +22,7 @@ const previewAddress = ref('')
 const previewLoading = ref(false)
 const previewCenter = ref<{ lat: number; lng: number } | null>(null)
 const mapDragging = ref(false)
+const switchingPickId = ref<number | null>(null)
 const normalizedKeyword = computed(() => keyword.value.trim().toLowerCase())
 let mapCtx: UniApp.MapContext | null = null
 
@@ -120,7 +122,7 @@ const loadPickPoints = async () => {
   try {
     points.value = await getPickPointList()
   } catch (error: any) {
-    uni.showToast({ title: error?.message || '自提点加载失败', icon: 'none' })
+    notifyError(error?.message || '自提点加载失败')
     points.value = []
   } finally {
     loading.value = false
@@ -179,11 +181,17 @@ const syncSelectedPick = () => {
 }
 
 const setDefaultPick = (point: PickPointItem) => {
+  if (switchingPickId.value === point.id) return
+  switchingPickId.value = point.id
+  // 先更新选中态，避免视觉卡顿
   uni.setStorageSync('default_pick_point_id', point.id)
   uni.setStorageSync('default_pick_point_name', point.name)
   selectedPickId.value = point.id
-  uni.showToast({ title: '已设为默认自提点', icon: 'success' })
+  notifySuccess(`已切换为 ${point.name}`)
   refreshMapPreview()
+  setTimeout(() => {
+    switchingPickId.value = null
+  }, 200)
 }
 
 const handleRegionChange = (e: any) => {
@@ -193,7 +201,7 @@ const handleRegionChange = (e: any) => {
 
 const readCenterCoordinate = () => {
   if (!mapCtx) {
-    uni.showToast({ title: '地图未就绪', icon: 'none' })
+    notifyInfo('地图未就绪')
     return
   }
   mapCtx.getCenterLocation({
@@ -201,21 +209,21 @@ const readCenterCoordinate = () => {
       const lat = Number(res.latitude)
       const lng = Number(res.longitude)
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        uni.showToast({ title: '读取中心坐标失败', icon: 'none' })
+        notifyError('读取中心坐标失败')
         return
       }
       previewCenter.value = { lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) }
-      uni.showToast({ title: '已读取中心坐标', icon: 'success' })
+      notifySuccess('已读取中心坐标')
     },
     fail: () => {
-      uni.showToast({ title: '读取中心坐标失败', icon: 'none' })
+      notifyError('读取中心坐标失败')
     }
   })
 }
 
 const copyCenterCoordinate = () => {
   if (!previewCenter.value) {
-    uni.showToast({ title: '暂无坐标可复制', icon: 'none' })
+    notifyInfo('暂无坐标可复制')
     return
   }
   uni.setClipboardData({
@@ -245,7 +253,7 @@ onReady(() => {
   <view class="min-h-screen bg-[#F8F8F8]">
     <!-- 搜索栏 -->
     <view
-      class="bg-white px-4 pt-3 pb-2 sticky top-0 border-b border-gray-100 z-10"
+      class="bg-white px-4 pt-3 pb-3 sticky top-0 border-b border-gray-100 z-10"
     >
       <view
         class="h-14 p-1 bg-white border border-gray-200 rounded-full shadow-sm"
@@ -271,22 +279,27 @@ onReady(() => {
     </view>
 
     <!-- 列表 -->
-    <view class="p-3">
-      <BaseCard class="mb-3">
-        <view class="flex items-center justify-between">
-          <view>
-            <text class="text-sm font-bold text-[#2F5233]">地图选点</text>
-            <text class="block text-[22rpx] text-gray-500 mt-1">大地图模式更直观，先定位再选自提点</text>
+    <view class="p-3 pt-4">
+      <BaseCard class="mb-4 map-entry-card">
+        <view class="flex items-center justify-between gap-3">
+          <view class="flex-1 min-w-0">
+            <text class="text-base font-bold text-[#2F5233] leading-6">地图选点</text>
+            <text class="block text-[24rpx] text-gray-500 mt-1 leading-5">大地图模式更直观，先定位再选自提点</text>
           </view>
-          <BaseButton text="打开地图" @click="openPickMapPage" />
+          <BaseButton text="打开地图" @click="openPickMapPage" class="shrink-0" />
         </view>
       </BaseCard>
 
-      <view class="flex justify-between items-center mb-2 px-1">
-        <text class="text-xs text-gray-500"
-          >附近共有 {{ filteredPoints.length }} 个自提点</text
+      <view class="flex justify-between items-center mb-3 px-1">
+        <text class="text-xs text-gray-500">
+          附近共有 {{ filteredPoints.length }} 个自提点
+        </text>
+        <view
+          class="status-pill"
+          :class="selectedPickId ? 'status-pill-success' : 'status-pill-neutral'"
         >
-        <text class="text-xs text-[#F08800]">{{ selectedPickId ? '已设置默认自提点' : '尚未设置默认自提点' }}</text>
+          {{ selectedPickId ? '已设置默认自提点' : '尚未设置默认自提点' }}
+        </view>
       </view>
 
       <BaseCard v-for="point in filteredPoints" :key="point.id" class="mb-3">
@@ -327,6 +340,31 @@ onReady(() => {
 <style scoped>
 .wxss-page-fix {
   display: block;
+}
+
+.map-entry-card {
+  padding-top: 6rpx;
+  padding-bottom: 6rpx;
+}
+
+.status-pill {
+  font-size: 22rpx;
+  line-height: 1;
+  padding: 10rpx 14rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid transparent;
+}
+
+.status-pill-success {
+  color: #166534;
+  background: #ecfdf3;
+  border-color: #bbf7d0;
+}
+
+.status-pill-neutral {
+  color: #64748b;
+  background: #f8fafc;
+  border-color: #e2e8f0;
 }
 </style>
 

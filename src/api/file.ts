@@ -1,9 +1,16 @@
 import type { Result } from '@/types/response'
 
 const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8080'
+  (import.meta.env.VITE_API_BASE_URL as string) || 'https://localhost:8080'
 
 export function uploadAvatar(filePath: string): Promise<Result<{ url: string }>> {
+  return uploadBizFile(filePath, 'avatar')
+}
+
+export function uploadBizFile(
+  filePath: string,
+  bizType: 'avatar' | 'realname' | 'license' | 'face'
+): Promise<Result<{ url: string }>> {
   return new Promise((resolve, reject) => {
     const token = uni.getStorageSync('token')
     uni.uploadFile({
@@ -11,7 +18,7 @@ export function uploadAvatar(filePath: string): Promise<Result<{ url: string }>>
       filePath,
       name: 'file',
       formData: {
-        bizType: 'avatar',
+        bizType,
         uploader: 'miniapp-user'
       },
       header: token ? { Authorization: token } : {},

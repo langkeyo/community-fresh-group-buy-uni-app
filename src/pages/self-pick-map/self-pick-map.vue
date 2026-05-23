@@ -2,6 +2,7 @@
 import BaseButton from '@/components/base/BaseButton.vue'
 import { getPickPointList } from '@/services/pick-point'
 import type { PickPointItem } from '@/types/pick-point'
+import { notifyError, notifyInfo, notifySuccess } from '@/utils/notify'
 import { onMounted, ref } from 'vue'
 
 const loading = ref(false)
@@ -14,18 +15,43 @@ const userLng = ref<number | null>(null)
 
 const mapMarkers = ref<any[]>([])
 const mapCircles = ref<any[]>([])
+const MAP_FOCUS_LAT_OFFSET = 0.0032
 
 function rebuildMarkers() {
   mapMarkers.value = points.value
     .filter((x) => Number.isFinite(Number(x.latitude)) && Number.isFinite(Number(x.longitude)))
-    .map((x) => ({
-      id: x.id,
-      latitude: Number(x.latitude),
-      longitude: Number(x.longitude),
-      title: x.name,
-      width: selectedId.value === x.id ? 34 : 28,
-      height: selectedId.value === x.id ? 34 : 28
-    }))
+    .map((x) => {
+      const isSelected = selectedId.value === x.id
+      return {
+        id: x.id,
+        latitude: Number(x.latitude),
+        longitude: Number(x.longitude),
+        title: x.name,
+        iconPath: isSelected
+          ? '/static/icons/map-marker-selected.svg'
+          : '/static/icons/map-marker-green.svg',
+        width: isSelected ? 34 : 28,
+        height: isSelected ? 34 : 28,
+        callout: {
+          content: x.name,
+          display: 'ALWAYS',
+          padding: 6,
+          borderRadius: 10,
+          color: isSelected ? '#ffffff' : '#1f2937',
+          bgColor: isSelected ? '#f59e0b' : '#ffffff'
+        }
+      }
+    })
+}
+
+function focusPointOnVisibleArea(point: PickPointItem) {
+  const lat = Number(point.latitude)
+  const lng = Number(point.longitude)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
+
+  // 地图下半部分被底部面板覆盖，选中点需上移到可视区域中上部
+  centerLat.value = lat - MAP_FOCUS_LAT_OFFSET
+  centerLng.value = lng
 }
 
 async function locateUser() {
@@ -57,13 +83,12 @@ async function loadData() {
     const stored = Number(uni.getStorageSync('default_pick_point_id'))
     selectedId.value = Number.isFinite(stored) && stored > 0 ? stored : points.value[0]?.id || null
     const selected = points.value.find((x) => x.id === selectedId.value)
-    if (selected?.latitude && selected?.longitude) {
-      centerLat.value = Number(selected.latitude)
-      centerLng.value = Number(selected.longitude)
+    if (selected) {
+      focusPointOnVisibleArea(selected)
     }
     rebuildMarkers()
   } catch (e: any) {
-    uni.showToast({ title: e?.message || '自提点加载失败', icon: 'none' })
+    notifyError(e?.message || '自提点加载失败')
   } finally {
     loading.value = false
   }
@@ -73,28 +98,29 @@ function onMarkerTap(e: any) {
   const id = Number(e?.detail?.markerId)
   if (!id) return
   selectedId.value = id
+  const point = points.value.find((x) => x.id === id)
+  if (point) {
+    focusPointOnVisibleArea(point)
+  }
   rebuildMarkers()
 }
 
 function selectPoint(point: PickPointItem) {
   selectedId.value = point.id
-  if (point.latitude && point.longitude) {
-    centerLat.value = Number(point.latitude)
-    centerLng.value = Number(point.longitude)
-  }
+  focusPointOnVisibleArea(point)
   rebuildMarkers()
 }
 
 function confirmPick() {
   const selected = points.value.find((x) => x.id === selectedId.value)
   if (!selected) {
-    uni.showToast({ title: '请先选择自提点', icon: 'none' })
+    notifyInfo('请先选择自提点')
     return
   }
   uni.setStorageSync('default_pick_point_id', selected.id)
   uni.setStorageSync('default_pick_point_name', selected.name)
-  uni.showToast({ title: '已设置默认自提点', icon: 'success' })
-  setTimeout(() => uni.navigateBack(), 350)
+  notifySuccess(`已切换为 ${selected.name}`)
+  setTimeout(() => uni.navigateBack(), 180)
 }
 
 onMounted(async () => {

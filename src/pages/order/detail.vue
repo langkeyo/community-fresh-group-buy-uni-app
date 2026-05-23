@@ -10,6 +10,7 @@ import { useOrderStore } from '@/stores/order'
 import type { ProductItem } from '@/types/product'
 import { useUserStore } from '@/stores/user'
 import type { OrderInfo } from '@/types/order'
+import { isLeaderUser } from '@/utils/leader'
 import { onLoad } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 
@@ -49,7 +50,7 @@ onLoad((query) => {
   }
   const stored = uni.getStorageSync('userInfo')
   const info = stored ? (typeof stored === 'string' ? JSON.parse(stored) : stored) : null
-  isLeader.value = Boolean(info?.isLeader)
+  isLeader.value = isLeaderUser(info?.isLeader)
   loadOrderDetail(id)
 })
 
@@ -63,6 +64,7 @@ const currentStatusUI = computed(() => {
 const currentStatusKind = computed(() => {
   const s = orderInfo.value?.status
   if (s === 3) return 'success'
+  if (s === 4) return 'info'
   if (s === 2) return 'info'
   if (s === 0 || s === 1) return 'warning'
   return 'info'
@@ -75,7 +77,7 @@ const displayCreateTime = computed(() => {
 
 const nextStatus = computed<number | null>(() => {
   const s = orderInfo.value?.status
-  if (s === 2) return 3
+  if (s === 4) return 3
   return null
 })
 
@@ -139,7 +141,7 @@ async function loadOrderDetail(id: string) {
     orderInfo.value = target
     const dt = new Date(String(target.createTime || '').replace(' ', 'T'))
     const ts = Number.isNaN(dt.getTime()) ? 0 : dt.getTime()
-    if (target.status === 2 && ts && Date.now() - ts >= AUTO_RECEIVE_MS) {
+    if (target.status === 4 && ts && Date.now() - ts >= AUTO_RECEIVE_MS) {
       await updateStatus(target.id, 3)
       const refreshed = await fetchOrderDetail(id)
       if (refreshed) orderInfo.value = refreshed
@@ -211,18 +213,19 @@ function goLeaderWorkbench() {
 }
 
 const canConfirmReceipt = computed(() => {
-  return orderInfo.value?.status === 2
+  return orderInfo.value?.status === 4
 })
 
 const canRefund = computed(() => {
   const s = orderInfo.value?.status
-  return s === 0 || s === 1 || s === 2
+  return s === 0 || s === 1 || s === 2 || s === 4
 })
 
 const systemRuleTip = computed(() => {
   const s = orderInfo.value?.status
   if (s === 1) return '系统规则：下单后2小时未成团将自动退款。'
-  if (s === 2) return '系统规则：待收货超过3天将自动确认收货。'
+  if (s === 2) return '系统规则：请到自提点提货，团长核销后可确认收货。'
+  if (s === 4) return '系统规则：团长核销后超过3天将自动确认收货。'
   return '系统规则：状态会随团购与履约进度自动更新。'
 })
 
@@ -244,6 +247,7 @@ async function doConfirmReceipt() {
   try {
     await updateStatus(orderInfo.value.id, 3)
     showConfirmModal.value = false
+    uni.setStorageSync('order_need_refresh', true)
     uni.showToast({ title: '已确认收货', icon: 'success' })
     await loadOrderDetail(String(orderInfo.value.id))
     if (canReview.value) {
@@ -271,6 +275,7 @@ async function doApplyRefund() {
   try {
     await updateStatus(orderInfo.value.id, -1)
     showAfterSaleModal.value = false
+    uni.setStorageSync('order_need_refresh', true)
     uni.showToast({ title: `${tipMap[afterSaleType.value]}申请已提交，团长将联系您`, icon: 'success' })
     await loadOrderDetail(String(orderInfo.value.id))
   } catch (error: any) {
@@ -395,7 +400,7 @@ async function submitReview() {
           </view>
           <view class="flex items-center justify-between text-xs text-gray-500">
             <text>自动确认收货</text>
-            <text>发货后3天自动确认</text>
+            <text>团长核销后3天自动确认</text>
           </view>
           <text v-if="remarkLabel" class="block text-xs text-gray-500">备注：{{ remarkLabel }}</text>
           <text class="block text-xs text-orange-500">{{ systemRuleTip }}</text>
@@ -475,7 +480,7 @@ async function submitReview() {
         </view>
       </view>
 
-      <view v-if="nextStatus && isLeader" class="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+      <view v-if="orderInfo?.status === 2 && isLeader" class="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
         <text class="block text-xs text-amber-700">
           团长核销操作已统一到「团长工作台」，订单详情仅展示状态。
         </text>

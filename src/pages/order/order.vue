@@ -15,7 +15,8 @@ const statusList = [
   { label: '待支付', value: 0 },
   { label: '待成团', value: 1 },
   { label: '待收货', value: 2 },
-  { label: '已取货', value: 3 }
+  { label: '待确认', value: 4 },
+  { label: '已完成', value: 3 }
 ]
 
 const userStore = useUserStore()
@@ -38,7 +39,8 @@ function parseTime(ts?: string) {
 
 function estimatePickupTip(createTime?: string, status?: number) {
   const date = parseTime(createTime)
-  if (status === 3) return '已提货'
+  if (status === 3) return '订单已完成'
+  if (status === 4) return '团长已核销，请尽快确认收货'
   if (status === -1) return '订单已取消（超时未成团将自动退款）'
   if (status === 0) return '待支付，支付后进入拼团'
   if (status === 1) {
@@ -58,7 +60,7 @@ function estimatePickupTip(createTime?: string, status?: number) {
 async function autoConfirmIfNeeded(list: OrderInfo[]) {
   const now = Date.now()
   const confirmIds = list
-    .filter((item) => item.status === 2)
+    .filter((item) => item.status === 4)
     .filter((item) => {
       const date = parseTime(item.createTime)
       if (!date) return false
@@ -141,6 +143,7 @@ function getStatusUI(status: number) {
 
 function getStatusKind(status: number) {
   if (status === 3) return 'success'
+  if (status === 4) return 'info'
   if (status === 2) return 'info'
   if (status === 0 || status === 1) return 'warning'
   return 'info'
@@ -211,21 +214,24 @@ onPullDownRefresh(async () => {
     <text class="text-base font-bold text-fresh">订单列表</text>
 
     <!-- 订单筛选栏 -->
-    <view class="flex gap-3">
-      <view
-        v-for="item in statusList"
-        :key="item.value"
-        class="text-sm px-3 py-1.5 rounded-full border"
-        :class="
-          item.value === activeStatus
-            ? 'bg-primary text-white border-primary'
-            : 'bg-white text-gray-600 border-gray-200'
-        "
-        @click="activeStatus = item.value"
-      >
-        {{ item.label }}({{ statusCountMap[String(item.value)] || 0 }})
+    <scroll-view class="status-scroll" scroll-x show-scrollbar="false">
+      <view class="status-row">
+        <view
+          v-for="item in statusList"
+          :key="item.value"
+          class="status-pill"
+          :class="
+            item.value === activeStatus
+              ? 'status-pill-active'
+              : 'status-pill-default'
+          "
+          @click="activeStatus = item.value"
+        >
+          <text class="status-pill-label">{{ item.label }}</text>
+          <text class="status-pill-count">({{ statusCountMap[String(item.value)] || 0 }})</text>
+        </view>
       </view>
-    </view>
+    </scroll-view>
 
     <!-- 订单卡片列表 -->
     <view v-if="loading" class="py-8 text-center">
@@ -291,6 +297,51 @@ onPullDownRefresh(async () => {
 <style scoped>
 .wxss-page-fix {
   display: block;
+}
+
+.status-scroll {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.status-row {
+  display: inline-flex;
+  gap: 16rpx;
+  padding: 4rpx 0 2rpx;
+}
+
+.status-pill {
+  min-width: 120rpx;
+  padding: 10rpx 18rpx;
+  border-radius: 9999rpx;
+  border: 1rpx solid #e5e7eb;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4rpx;
+}
+
+.status-pill-active {
+  background: #f08800;
+  border-color: #f08800;
+  color: #ffffff;
+}
+
+.status-pill-default {
+  background: #ffffff;
+  border-color: #e5e7eb;
+  color: #4b5563;
+}
+
+.status-pill-label {
+  font-size: 25rpx;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.status-pill-count {
+  font-size: 22rpx;
+  line-height: 1.2;
 }
 </style>
 

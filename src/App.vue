@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { onLaunch, onShow, onHide } from '@dcloudio/uni-app'
 import { getNoticeList } from '@/services/notice'
-import { ref } from 'vue'
+import { notifyInfo } from '@/utils/notify'
+import { playNoticeSound } from '@/utils/sound'
 
 const NOTICE_POPUP_MARK_KEY = 'notice_popup_last_key'
 const NOTICE_POLL_INTERVAL = 20000
@@ -9,11 +10,6 @@ const NOTICE_REPEAT_AFTER_MS = 10 * 60 * 1000
 let noticeTimer: ReturnType<typeof setInterval> | null = null
 let checkingNotice = false
 let appVisible = false
-let dismissTimer: ReturnType<typeof setTimeout> | null = null
-const toastVisible = ref(false)
-const toastTitle = ref('')
-const toastBody = ref('')
-const startY = ref(0)
 
 function getCurrentUserId(): number {
   const token = uni.getStorageSync('token')
@@ -66,37 +62,8 @@ async function checkNoticeAndPopup() {
 }
 
 function showNoticeToast(title: string, content: string) {
-  toastTitle.value = title
-  toastBody.value = content
-  toastVisible.value = true
-  if (dismissTimer) clearTimeout(dismissTimer)
-  dismissTimer = setTimeout(() => {
-    closeNoticeToast()
-  }, 3000)
-}
-
-function closeNoticeToast() {
-  toastVisible.value = false
-  if (dismissTimer) {
-    clearTimeout(dismissTimer)
-    dismissTimer = null
-  }
-}
-
-function openNoticeCenter() {
-  closeNoticeToast()
-  uni.navigateTo({ url: '/pages/notice/notice' })
-}
-
-function onToastTouchStart(event: any) {
-  startY.value = Number(event?.changedTouches?.[0]?.clientY || 0)
-}
-
-function onToastTouchEnd(event: any) {
-  const endY = Number(event?.changedTouches?.[0]?.clientY || 0)
-  if (endY - startY.value < -20) {
-    closeNoticeToast()
-  }
+  notifyInfo(`${title}：${content}`, '新通知')
+  playNoticeSound()
 }
 
 function startNoticePolling() {
@@ -123,26 +90,9 @@ onShow(async () => {
 onHide(() => {
   appVisible = false
   stopNoticePolling()
-  closeNoticeToast()
   console.log('App Hide')
 })
 </script>
-<template>
-  <view
-    v-if="toastVisible"
-    class="notice-toast"
-    @click="openNoticeCenter"
-    @touchstart="onToastTouchStart"
-    @touchend="onToastTouchEnd"
-  >
-    <view class="notice-dot"></view>
-    <view class="notice-content">
-      <text class="notice-title">{{ toastTitle }}</text>
-      <text class="notice-body">{{ toastBody }}</text>
-    </view>
-    <text class="notice-link">查看</text>
-  </view>
-</template>
 <style>
 @tailwind base;
 @tailwind components;
@@ -198,56 +148,12 @@ page {
   }
 }
 
-.notice-toast {
-  position: fixed;
-  left: 20rpx;
-  right: 20rpx;
-  top: calc(18rpx + env(safe-area-inset-top));
-  z-index: 999999;
-  min-height: 96rpx;
-  border-radius: 16rpx;
-  background: rgba(17, 24, 39, 0.96);
-  box-shadow: 0 10rpx 30rpx rgba(0, 0, 0, 0.22);
-  padding: 14rpx 16rpx;
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
+/* Disable uview injected root toast host; we use custom top-message host instead. */
+ku-root-toast-host {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
 }
 
-.notice-dot {
-  width: 14rpx;
-  height: 14rpx;
-  border-radius: 50%;
-  background: #ef4444;
-  flex-shrink: 0;
-}
-
-.notice-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.notice-title {
-  display: block;
-  color: #fff;
-  font-size: 26rpx;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.notice-body {
-  display: block;
-  margin-top: 6rpx;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 22rpx;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.notice-link {
-  color: #fbbf24;
-  font-size: 24rpx;
-  margin-left: 8rpx;
-}
 </style>

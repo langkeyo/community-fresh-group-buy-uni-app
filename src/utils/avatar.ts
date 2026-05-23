@@ -1,5 +1,5 @@
 const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8080'
+  (import.meta.env.VITE_API_BASE_URL as string) || 'https://localhost:8080'
 
 function toAbsoluteUrl(url: string): string {
   if (!url) return ''

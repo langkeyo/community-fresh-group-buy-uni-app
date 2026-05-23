@@ -61,6 +61,7 @@ export const updateStatusApi = (orderId: number | string, status: number) => {
 
 export interface OpenGroupItem {
   groupBuyId: string
+  creatorUserId?: number
   currentCount: number
   targetCount: number
   latestCreateTime: string
@@ -95,7 +96,8 @@ export const leaderConfirmPickApi = (
 
 export const getLeaderWorkbenchApi = (leaderId: number, pickPointId: number) => {
   return http.get<Result<LeaderWorkbenchResp>>('/api/order/leader/workbench', {
-    params: { leaderId, pickPointId }
+    params: { leaderId, pickPointId },
+    custom: { silentError: true }
   }) as unknown as Promise<Result<LeaderWorkbenchResp>>
 }
 
