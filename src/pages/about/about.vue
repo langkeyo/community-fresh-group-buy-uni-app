@@ -23,3 +23,9 @@ const versions = [
     </view>
   </view>
 </template>
+
+<style scoped>
+.about-page-fix {
+  display: block;
+}
+</style>

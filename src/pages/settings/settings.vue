@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import BaseSmartImage from '@/components/base/BaseSmartImage.vue'
 import { getUserInfo } from '@/api/user'
 import { DEFAULT_AVATAR_PATH } from '@/constants/ui'
 import { getNoticeList } from '@/services/notice'
 import { getSystemConfig } from '@/services/system-config'
+import { useUserStore } from '@/stores/user'
 import { onShow } from '@dcloudio/uni-app'
 import { ref } from 'vue'
 
@@ -13,6 +13,22 @@ const unreadCount = ref(0)
 const servicePhone = ref('400-800-1234')
 const serviceWechat = ref('ligo-service')
 const loading = ref(false)
+const avatarLoadFailed = ref(false)
+const userStore = useUserStore()
+const API_BASE_URL =
+  (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8080'
+
+function toAbsoluteUrl(url: string): string {
+  if (!url) return ''
+  if (/^https?:\/\//i.test(url)) return url
+  if (url.startsWith('wxfile://')) return url
+  if (url.startsWith('/')) return `${API_BASE_URL}${url}`
+  return `${API_BASE_URL}/${url}`
+}
+
+function isLikelyInvalidMiniProgramUrl(url: string): boolean {
+  return /^(https?:\/\/)?(localhost|127\.0\.0\.1)/i.test(url)
+}
 
 function getUserId(): number {
   const stored = uni.getStorageSync('userInfo')
@@ -40,11 +56,30 @@ async function loadData() {
   if (!ensureLogin('查看设置')) return
   loading.value = true
   try {
+    const cached = uni.getStorageSync('userInfo')
+    const cachedUser = cached
+      ? typeof cached === 'string'
+        ? JSON.parse(cached)
+        : cached
+      : null
+    if (cachedUser?.avatar) {
+      avatar.value = toAbsoluteUrl(String(cachedUser.avatar))
+      avatarLoadFailed.value = false
+    }
+
     const [userRes, config] = await Promise.all([getUserInfo(), getSystemConfig()])
-    if (userRes.code === 0 && userRes.data) {
+    if ((userRes.code === 0 || userRes.code === 200) && userRes.data) {
       nickname.value = userRes.data.nickname || '社区用户'
-      avatar.value = userRes.data.avatar || ''
+      const resolvedAvatar = toAbsoluteUrl(userRes.data.avatar || cachedUser?.avatar || '')
+      const fallbackAvatar = toAbsoluteUrl(cachedUser?.avatar || '')
+      avatar.value = isLikelyInvalidMiniProgramUrl(resolvedAvatar)
+        ? isLikelyInvalidMiniProgramUrl(fallbackAvatar)
+          ? ''
+          : fallbackAvatar
+        : resolvedAvatar
+      avatarLoadFailed.value = false
       uni.setStorageSync('userInfo', userRes.data)
+      userStore.setUserId(Number(userRes.data.id))
     }
     servicePhone.value = config.servicePhone || servicePhone.value
     serviceWechat.value = config.serviceWechat || serviceWechat.value
@@ -102,9 +137,12 @@ function clearLocalCache() {
       if (!res.confirm) return
       const token = uni.getStorageSync('token')
       const userInfo = uni.getStorageSync('userInfo')
+      const userId = uni.getStorageSync('user_id')
       uni.clearStorageSync()
       if (token) uni.setStorageSync('token', token)
       if (userInfo) uni.setStorageSync('userInfo', userInfo)
+      if (userId) uni.setStorageSync('user_id', userId)
+      userStore.hydrateUserId()
       uni.showToast({ title: '缓存已清理', icon: 'success' })
     }
   })
@@ -119,6 +157,7 @@ function logout() {
       if (!res.confirm) return
       uni.removeStorageSync('token')
       uni.removeStorageSync('userInfo')
+      userStore.clearUserId()
       uni.showToast({ title: '已退出登录', icon: 'none' })
       setTimeout(() => {
         uni.navigateBack()
@@ -130,22 +169,26 @@ function logout() {
 onShow(() => {
   loadData()
 })
+
+function onAvatarError() {
+  avatarLoadFailed.value = true
+}
 </script>
 
 <template>
   <view class="settings-page">
-    <view class="settings-card profile-card">
-      <BaseSmartImage
-        :src="avatar || DEFAULT_AVATAR_PATH"
-        class-name="profile-avatar"
-        fallback-bg="#f3f4f6"
-        fallback-color="#334155"
-        fallback-text="头像"
+    <view class="settings-card profile-card" @click="goAccountSecurity">
+      <image
+        :src="avatarLoadFailed ? DEFAULT_AVATAR_PATH : (avatar || DEFAULT_AVATAR_PATH)"
+        mode="aspectFill"
+        class="w-[96rpx] h-[96rpx] rounded-full overflow-hidden bg-gray-100 shrink-0"
+        @error="onAvatarError"
       />
       <view class="profile-meta">
         <text class="profile-name">{{ nickname }}</text>
-        <text class="profile-sub">{{ loading ? '同步数据中...' : '账号与通知设置' }}</text>
+        <text class="profile-sub">{{ loading ? '同步数据中...' : '点击可编辑个人资料' }}</text>
       </view>
+      <uni-icons type="right" size="16" color="#c4c4c4" />
     </view>
 
     <view class="settings-card">
@@ -236,14 +279,9 @@ onShow(() => {
   gap: 20rpx;
 }
 
-.profile-avatar {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 50%;
-  overflow: hidden;
-}
-
 .profile-meta {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 8rpx;

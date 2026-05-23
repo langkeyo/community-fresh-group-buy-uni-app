@@ -26,6 +26,12 @@ export interface SystemConfigResp {
       sort: number
       badgeText?: string
     }[]
+    aiAssistant?: {
+      enabled?: boolean
+      apiKey?: string
+      leaderPrompt?: string
+      quickPrompts?: string[]
+    }
   }
 }
 

@@ -27,10 +27,18 @@ export interface AiRecommendResp {
   recipe: AiRecipeResp
 }
 
-export const recommendAiApi = (query: string) => {
+export interface AiRecommendOptions {
+  apiKey?: string
+  contextPrompt?: string
+}
+
+export const recommendAiApi = (query: string, options?: AiRecommendOptions) => {
   return http.post<Result<AiRecommendResp>>(
     '/api/ai/recommend',
-    {},
+    {
+      apiKey: options?.apiKey || '',
+      contextPrompt: options?.contextPrompt || ''
+    },
     {
       params: { query },
       timeout: 45000

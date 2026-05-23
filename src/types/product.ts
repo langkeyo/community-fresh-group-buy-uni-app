@@ -7,5 +7,6 @@ export interface ProductItem {
   groupPrice3: number | null
   stock: number
   images: string[]
+  videoUrl?: string
   status: number
 }

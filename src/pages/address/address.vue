@@ -35,7 +35,7 @@ const goToPickPointPage = () => {
 
 const showAddressCapabilityTip = () => {
   uni.showToast({
-    title: '收货地址管理暂未开通，请使用自提点',
+    title: '当前以自提点收货为主，已为你保留常用设置',
     icon: 'none'
   })
 }
@@ -58,9 +58,9 @@ onShow(() => {
   <view class="min-h-screen bg-gray-50 p-6 space-y-6">
     <view class="bg-white rounded-xl p-6 shadow-sm">
       <text class="text-lg font-bold text-fresh block mb-3">默认收货地址</text>
-      <text class="text-base text-gray-700 block">能力状态：LIMITED</text>
+      <text class="text-base text-gray-700 block">收货方式：社区自提</text>
       <text class="text-sm text-gray-500 block mt-2"
-        >当前版本仅支持自提点，不支持到家收货地址管理</text
+        >已为你优先展示常用自提点，支持一键切换与地址复制</text
       >
       <view class="mt-4 flex gap-3">
         <view
@@ -101,3 +101,10 @@ onShow(() => {
     </view>
   </view>
 </template>
+
+<style scoped>
+.wxss-page-fix {
+  display: block;
+}
+</style>
+

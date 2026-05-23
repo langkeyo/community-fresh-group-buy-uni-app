@@ -26,3 +26,10 @@ const faqList = [
     </view>
   </view>
 </template>
+
+<style scoped>
+.wxss-page-fix {
+  display: block;
+}
+</style>
+

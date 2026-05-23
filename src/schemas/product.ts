@@ -16,7 +16,8 @@ export const productItemSchema = z.object({
   groupPrice2: numberOrNull.optional().default(null),
   groupPrice3: numberOrNull.optional().default(null),
   stock: z.coerce.number().optional().default(0),
-  images: z.string().optional().default(''),
+  images: z.union([z.string(), z.array(z.string())]).optional().default(''),
+  videoUrl: z.string().optional().default(''),
   status: z.coerce.number().optional().default(1)
 })
 

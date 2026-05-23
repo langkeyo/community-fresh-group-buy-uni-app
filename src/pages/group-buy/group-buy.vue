@@ -2,21 +2,28 @@
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseField from '@/components/base/BaseField.vue'
 import BaseSmartImage from '@/components/base/BaseSmartImage.vue'
+import { getActiveGroupBuyCampaignListApi } from '@/api/group-buy'
 import { createOrder, getOpenGroupList } from '@/services/order'
 import type { OpenGroupItem } from '@/api/order'
 import { getPickPointDetail } from '@/services/pick-point'
 import { getProductDetail } from '@/services/product'
+import { getEnabledCoupons } from '@/services/coupon'
+import { requestOrderSubscribeOnce } from '@/services/subscribe'
 import { useOrderStore } from '@/stores/order'
 import type { ProductItem } from '@/types/product'
 import { useUserStore } from '@/stores/user'
 import { onLoad } from '@dcloudio/uni-app'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const userStore = useUserStore()
 const orderStore = useOrderStore()
 const ORDER_REFRESH_FLAG = 'order_need_refresh'
+const GROUP_BUY_FORM_CACHE_KEY = 'group_buy_form_cache_v1'
 const isSubmitting = ref(false)
 const currentAction = ref<'start' | 'join' | ''>('')
+const pendingAction = ref<'start' | 'join' | ''>('')
+const showPaySheet = ref(false)
+const payMethod = ref<'balance' | 'wechat'>('balance')
 const formData = ref({
   groupType: 2,
   receiverName: '',
@@ -32,6 +39,52 @@ const productDetail = ref<ProductItem | null>(null)
 const openGroups = ref<OpenGroupItem[]>([])
 const selectedGroupId = ref('')
 const loadingGroups = ref(false)
+const hasActiveCampaign = ref(true)
+const pendingJoinGroupId = ref('')
+const couponSourceHint = ref('正在加载优惠券...')
+
+function loadFormCache() {
+  userStore.hydrateUserId()
+  const raw = uni.getStorageSync(GROUP_BUY_FORM_CACHE_KEY)
+  const all = raw && typeof raw === 'object' ? raw : {}
+  const byUser = Number(userStore.userId || 0)
+    ? (all[String(userStore.userId)] as Record<string, any>) || {}
+    : {}
+  formData.value.receiverName = String(byUser.receiverName || '').slice(0, 20)
+  formData.value.mobile = String(byUser.mobile || '').slice(0, 11)
+  formData.value.remark = String(byUser.remark || '').slice(0, 80)
+}
+
+function saveFormCache() {
+  userStore.hydrateUserId()
+  if (!userStore.userId) return
+  const raw = uni.getStorageSync(GROUP_BUY_FORM_CACHE_KEY)
+  const all = raw && typeof raw === 'object' ? raw : {}
+  all[String(userStore.userId)] = {
+    receiverName: formData.value.receiverName.trim(),
+    mobile: formData.value.mobile.trim(),
+    remark: formData.value.remark.trim()
+  }
+  uni.setStorageSync(GROUP_BUY_FORM_CACHE_KEY, all)
+}
+
+function clearFormCache() {
+  userStore.hydrateUserId()
+  if (!userStore.userId) return
+  const raw = uni.getStorageSync(GROUP_BUY_FORM_CACHE_KEY)
+  const all = raw && typeof raw === 'object' ? raw : {}
+  if (all[String(userStore.userId)]) {
+    delete all[String(userStore.userId)]
+    uni.setStorageSync(GROUP_BUY_FORM_CACHE_KEY, all)
+  }
+}
+
+watch(
+  () => [formData.value.receiverName, formData.value.mobile, formData.value.remark],
+  () => {
+    saveFormCache()
+  }
+)
 
 const displayPrice = computed(() => {
   if (!productDetail.value) return '--'
@@ -90,6 +143,10 @@ const finalPayable = computed(() => {
   const subtotal = Number(displayPrice.value || 0)
   const payable = Math.max(0, subtotal - couponDiscount.value)
   return payable.toFixed(2)
+})
+
+const payMethodLabel = computed(() => {
+  return payMethod.value === 'balance' ? '余额支付' : '微信支付'
 })
 
 function validateForm() {
@@ -182,11 +239,21 @@ function resetForm() {
     couponId: 'none',
     remark: ''
   }
+  clearFormCache()
 }
 
 async function handleSubmitGroupBuy(action: 'start' | 'join') {
+  userStore.hydrateUserId()
   if (isSubmitting.value) return
+  if (!userStore.userId) {
+    uni.showToast({ title: '请先登录后再下单', icon: 'none' })
+    return
+  }
   if (!validateForm()) return
+  if (!hasActiveCampaign.value) {
+    uni.showToast({ title: '当前商品未开团，暂不可拼团下单', icon: 'none' })
+    return
+  }
   if (
     productDetail.value?.stock !== undefined &&
     productDetail.value.stock <= 0
@@ -217,6 +284,7 @@ async function handleSubmitGroupBuy(action: 'start' | 'join') {
   isSubmitting.value = true
 
   try {
+    await requestOrderSubscribeOnce()
     await submitGroupBuy(action, safeProductId, safePickPointId)
 
     resetForm()
@@ -237,6 +305,42 @@ async function handleSubmitGroupBuy(action: 'start' | 'join') {
   }
 }
 
+async function checkActiveCampaign() {
+  if (productId.value === null) {
+    hasActiveCampaign.value = false
+    return
+  }
+  try {
+    const res = await getActiveGroupBuyCampaignListApi({
+      productId: productId.value,
+      pickPointId: pickPointId.value || undefined
+    })
+    hasActiveCampaign.value = res.code === 200 && (res.data || []).length > 0
+  } catch {
+    hasActiveCampaign.value = false
+  }
+}
+
+function openPaySheet(action: 'start' | 'join') {
+  if (isSubmitting.value) return
+  pendingAction.value = action
+  payMethod.value = 'balance'
+  showPaySheet.value = true
+}
+
+function closePaySheet() {
+  if (isSubmitting.value) return
+  showPaySheet.value = false
+  pendingAction.value = ''
+}
+
+async function handleConfirmPay() {
+  if (payMethod.value !== 'balance') return
+  if (!pendingAction.value) return
+  showPaySheet.value = false
+  await handleSubmitGroupBuy(pendingAction.value)
+}
+
 function pickOpenGroup(item: OpenGroupItem) {
   selectedGroupId.value = item.groupBuyId
   formData.value.groupType = item.targetCount === 3 ? 3 : 2
@@ -252,7 +356,14 @@ async function loadOpenGroups() {
   try {
     const list = await getOpenGroupList(productId.value, pickPointId.value)
     openGroups.value = list
-    if (!list.find((x) => x.groupBuyId === selectedGroupId.value)) {
+    if (pendingJoinGroupId.value && list.find((x) => x.groupBuyId === pendingJoinGroupId.value)) {
+      selectedGroupId.value = pendingJoinGroupId.value
+      const matched = list.find((x) => x.groupBuyId === pendingJoinGroupId.value)
+      if (matched) {
+        formData.value.groupType = matched.targetCount === 3 ? 3 : 2
+      }
+      pendingJoinGroupId.value = ''
+    } else if (!list.find((x) => x.groupBuyId === selectedGroupId.value)) {
       selectedGroupId.value = ''
     }
   } catch (error: any) {
@@ -264,12 +375,32 @@ async function loadOpenGroups() {
   }
 }
 
+async function loadEnabledCoupons() {
+  try {
+    const list = await getEnabledCoupons()
+    orderStore.setCouponList(list)
+    couponSourceHint.value = list.length
+      ? `已加载 ${list.length} 张可用优惠券`
+      : '暂无可用优惠券'
+    const valid = orderStore.getCouponById(formData.value.couponId)
+    if (!valid) {
+      formData.value.couponId = 'none'
+    }
+  } catch {
+    orderStore.setCouponList([])
+    formData.value.couponId = 'none'
+    couponSourceHint.value = '优惠券加载失败，当前仅支持不使用优惠券'
+  }
+}
+
 onLoad(async (query) => {
+  loadFormCache()
   const id = Number(query?.id)
   productId.value = Number.isFinite(id) && id > 0 ? id : null
 
   const pp = Number(query?.pickPointId)
   pickPointId.value = Number.isFinite(pp) && pp > 0 ? pp : null
+  pendingJoinGroupId.value = String(query?.joinGroupId || '').trim()
 
   if (pickPointId.value) {
     formData.value.pickupPoint = `自提点#${pickPointId.value}`
@@ -302,6 +433,8 @@ onLoad(async (query) => {
     }
   }
 
+  await loadEnabledCoupons()
+  await checkActiveCampaign()
   await loadOpenGroups()
 })
 </script>
@@ -309,7 +442,7 @@ onLoad(async (query) => {
 <template>
   <view
     class="min-h-screen px-4 pt-4 space-y-4 bg-gray-50"
-    style="padding-bottom: 140rpx"
+    style="padding-bottom: calc(220rpx + var(--safe-bottom))"
   >
     <text class="text-base font-bold text-fresh">拼团详情</text>
 
@@ -364,6 +497,7 @@ onLoad(async (query) => {
         <text class="text-base font-bold text-fresh">可加入的拼团</text>
         <text class="text-xs text-gray-400" @click="loadOpenGroups">刷新</text>
       </view>
+      <text class="text-xs text-gray-500">同一个拼团号代表同一团，成员会累计到同一进度。</text>
       <view v-if="loadingGroups" class="py-2 text-center">
         <text class="text-xs text-gray-400">加载中...</text>
       </view>
@@ -440,7 +574,7 @@ onLoad(async (query) => {
       <!-- 自提点 -->
       <BaseField label="自提点">
         <text class="text-base text-gray-700 base-field__text">
-          {{ formData.pickupPoint || '默认自提点（后续接真实选择）' }}
+          {{ formData.pickupPoint || '请先在自提网点设置默认自提点' }}
         </text>
       </BaseField>
 
@@ -460,6 +594,7 @@ onLoad(async (query) => {
             {{ coupon.title }}
           </view>
         </view>
+        <text class="block px-3 pb-2 text-[22rpx] text-gray-400">{{ couponSourceHint }}</text>
       </BaseField>
 
       <BaseField label="备注">
@@ -477,21 +612,21 @@ onLoad(async (query) => {
     <!-- <view class="h-8"></view> -->
 
     <view
+      v-if="!hasActiveCampaign"
+      class="text-xs text-red-500 text-center"
+    >
+      当前商品在该自提点无有效开团活动，暂不可下单
+    </view>
+
+    <view
       v-if="productDetail?.stock !== undefined && productDetail.stock <= 0"
       class="text-xs text-red-500 text-center"
     >
       库存不足，暂不可下单
     </view>
 
-    <!-- 支付说明 -->
     <view
-      class="bg-[#FFF7E6] border border-primary/30 text-primary rounded-lg p-3 text-sm"
-    >
-      当前为毕业设计演示环境：支付流程为模拟链路，订单与核销流程为真实联调数据。
-    </view>
-    <view
-      class="fixed left-0 right-0 bottom-0 bg-white border-t border-gray-100 px-4 pt-3"
-      style="padding-bottom: calc(env(safe-area-inset-bottom) + 12rpx)"
+      class="fixed left-0 right-0 bottom-0 bg-white border-t border-gray-100 px-4 pt-3 safe-bottom-padding"
     >
       <view class="flex items-end justify-between px-2 mb-3">
         <view>
@@ -511,9 +646,9 @@ onLoad(async (query) => {
         <BaseButton
           class="flex-1 action-btn"
           :loading="isSubmitting && currentAction === 'start'"
-          :disabled="isSubmitting || (productDetail?.stock ?? 0) <= 0"
+          :disabled="isSubmitting || (productDetail?.stock ?? 0) <= 0 || !hasActiveCampaign"
           text="发起拼团"
-          @click="handleSubmitGroupBuy('start')"
+          @click="openPaySheet('start')"
         />
         <BaseButton
           class="flex-1 action-btn"
@@ -522,11 +657,68 @@ onLoad(async (query) => {
           :disabled="
             isSubmitting ||
             (productDetail?.stock ?? 0) <= 0 ||
+            !hasActiveCampaign ||
             !openGroups.length ||
             !selectedGroupId
           "
           text="加入拼团"
-          @click="handleSubmitGroupBuy('join')"
+          @click="openPaySheet('join')"
+        />
+      </view>
+    </view>
+
+    <view v-if="showPaySheet" class="pay-mask" @click="closePaySheet"></view>
+    <view v-if="showPaySheet" class="pay-sheet">
+      <view class="pay-sheet__head">
+        <text class="text-base font-bold text-fresh">选择支付方式</text>
+        <text class="text-xs text-gray-500">演示环境：微信支付仅展示交互，不可用</text>
+      </view>
+
+      <view
+        class="pay-method"
+        :class="payMethod === 'balance' ? 'pay-method--active' : ''"
+        @click="payMethod = 'balance'"
+      >
+        <view class="pay-method__left">
+          <view class="pay-icon pay-icon--balance">￥</view>
+          <view>
+            <text class="block text-sm text-fresh font-bold">余额支付</text>
+            <text class="block text-xs text-gray-500">当前可用：演示余额</text>
+          </view>
+        </view>
+        <text class="text-xs text-primary">可使用</text>
+      </view>
+
+      <view class="pay-method pay-method--disabled">
+        <view class="pay-method__left">
+          <view class="pay-icon pay-icon--wechat">微</view>
+          <view>
+            <text class="block text-sm text-gray-500 font-bold">微信支付</text>
+            <text class="block text-xs text-gray-400">未配置商家测试号，答辩仅演示流程</text>
+          </view>
+        </view>
+        <text class="text-xs text-gray-400">暂不可用</text>
+      </view>
+
+      <view class="mt-3 flex items-end justify-between">
+        <view>
+          <text class="text-xs text-gray-500">本次支付方式</text>
+          <text class="text-sm text-fresh ml-1">{{ payMethodLabel }}</text>
+        </view>
+        <view>
+          <text class="text-xs text-gray-500">应付</text>
+          <text class="text-xl font-bold text-primary ml-1">￥{{ finalPayable }}</text>
+        </view>
+      </view>
+
+      <view class="mt-3 flex gap-2">
+        <BaseButton class="flex-1" type="default" text="取消" @click="closePaySheet" />
+        <BaseButton
+          class="flex-1"
+          :loading="isSubmitting"
+          :disabled="isSubmitting || payMethod !== 'balance'"
+          text="确认支付并下单"
+          @click="handleConfirmPay"
         />
       </view>
     </view>
@@ -536,5 +728,75 @@ onLoad(async (query) => {
 <style scoped>
 .action-btn {
   min-height: 80rpx;
+}
+
+.pay-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 50;
+}
+
+.pay-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  background: #fff;
+  border-top-left-radius: 24rpx;
+  border-top-right-radius: 24rpx;
+  padding: 24rpx;
+  padding-bottom: calc(var(--safe-bottom) + 18rpx);
+  box-shadow: 0 -12rpx 24rpx rgba(15, 23, 42, 0.12);
+}
+
+.pay-sheet__head {
+  margin-bottom: 16rpx;
+}
+
+.pay-method {
+  border: 1rpx solid #e5e7eb;
+  border-radius: 16rpx;
+  padding: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.pay-method--active {
+  border-color: #f08800;
+  background: #fff7ed;
+}
+
+.pay-method--disabled {
+  opacity: 0.78;
+}
+
+.pay-method__left {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.pay-icon {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.pay-icon--balance {
+  background: #f08800;
+}
+
+.pay-icon--wechat {
+  background: #07c160;
 }
 </style>

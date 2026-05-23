@@ -29,8 +29,27 @@ export const systemConfigSchema = z.object({
   recommendMenus: z.array(recommendMenuItemSchema).default([]),
   extendedSettings: z
     .object({
-      homeBanners: z.array(homeBannerItemSchema).default([])
+      homeBanners: z.array(homeBannerItemSchema).default([]),
+      apiWebhook: z
+        .object({
+          tencentMapKey: z.string().optional().default('')
+        })
+        .optional()
+        .default({ tencentMapKey: '' }),
+      aiAssistant: z
+        .object({
+          enabled: z.boolean().optional().default(true),
+          apiKey: z.string().optional().default(''),
+          leaderPrompt: z.string().optional().default(''),
+          quickPrompts: z.array(z.string()).optional().default([])
+        })
+        .optional()
+        .default({ enabled: true, apiKey: '', leaderPrompt: '', quickPrompts: [] })
     })
     .optional()
-    .default({ homeBanners: [] })
+    .default({
+      homeBanners: [],
+      apiWebhook: { tencentMapKey: '' },
+      aiAssistant: { enabled: true, apiKey: '', leaderPrompt: '', quickPrompts: [] }
+    })
 })

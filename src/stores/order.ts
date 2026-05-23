@@ -31,9 +31,7 @@ function safeParseMetaMap(raw: unknown): OrderMetaMap {
 }
 
 const defaultCoupons: CouponOption[] = [
-  { id: 'none', title: '不使用优惠券', discount: 0, minimumSpend: 0 },
-  { id: 'fresh-5', title: '生鲜满30减5', discount: 5, minimumSpend: 30 },
-  { id: 'group-10', title: '拼团满59减10', discount: 10, minimumSpend: 59 }
+  { id: 'none', title: '不使用优惠券', discount: 0, minimumSpend: 0 }
 ]
 
 export const useOrderStore = defineStore('order', () => {
@@ -46,6 +44,14 @@ export const useOrderStore = defineStore('order', () => {
 
   function getCouponById(id: string) {
     return couponMap.value.get(id)
+  }
+
+  function setCouponList(list: CouponOption[]) {
+    const merged = [
+      { id: 'none', title: '不使用优惠券', discount: 0, minimumSpend: 0 },
+      ...list.filter((item) => item.id !== 'none')
+    ]
+    couponList.value = merged
   }
 
   function saveOrderMeta(orderId: string, meta: OrderExtraMeta) {
@@ -61,6 +67,7 @@ export const useOrderStore = defineStore('order', () => {
 
   return {
     couponList,
+    setCouponList,
     getCouponById,
     saveOrderMeta,
     getOrderMeta

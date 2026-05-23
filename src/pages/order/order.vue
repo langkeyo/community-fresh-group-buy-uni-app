@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import BaseButton from '@/components/base/BaseButton.vue'
+import BaseSmartImage from '@/components/base/BaseSmartImage.vue'
 import BaseTag from '@/components/base/BaseTag.vue'
 import { ORDER_STATUS_FALLBACK, ORDER_STATUS_MAP } from '@/constants/order-status'
-import { getOrderList } from '@/services/order'
+import { getOrderList, updateStatus } from '@/services/order'
+import { getProductList } from '@/services/product'
 import { useUserStore } from '@/stores/user'
 import type { OrderInfo } from '@/types/order'
 import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
@@ -10,8 +12,9 @@ import { computed, ref } from 'vue'
 
 const statusList = [
   { label: '全部', value: 'all' as const },
+  { label: '待支付', value: 0 },
   { label: '待成团', value: 1 },
-  { label: '已成团', value: 2 },
+  { label: '待收货', value: 2 },
   { label: '已取货', value: 3 }
 ]
 
@@ -21,7 +24,85 @@ const orderList = ref<OrderInfo[]>([])
 const loading = ref(true)
 const errorMsg = ref('')
 const hasLoaded = ref(false)
+const lastLoadedUserId = ref(0)
 const ORDER_REFRESH_FLAG = 'order_need_refresh'
+const productCoverMap = ref<Record<number, string>>({})
+const GROUP_TIMEOUT_MS = 2 * 60 * 60 * 1000
+const AUTO_RECEIVE_MS = 72 * 60 * 60 * 1000
+
+function parseTime(ts?: string) {
+  if (!ts) return null
+  const date = new Date(String(ts).replace(' ', 'T'))
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function estimatePickupTip(createTime?: string, status?: number) {
+  const date = parseTime(createTime)
+  if (status === 3) return '已提货'
+  if (status === -1) return '订单已取消（超时未成团将自动退款）'
+  if (status === 0) return '待支付，支付后进入拼团'
+  if (status === 1) {
+    if (!date) return '待成团，2小时未成团将自动退款'
+    const deadline = date.getTime() + GROUP_TIMEOUT_MS
+    const remain = deadline - Date.now()
+    if (remain <= 0) return '已触发超时退款，请下拉刷新'
+    const mins = Math.ceil(remain / 60000)
+    return `待成团，约${mins}分钟后未成团将自动退款`
+  }
+  if (!date) return '预计成团后2小时可提货'
+  const hour = date.getHours()
+  if (hour < 12) return '预计今日18:00后可提货'
+  return '预计次日10:00后可提货'
+}
+
+async function autoConfirmIfNeeded(list: OrderInfo[]) {
+  const now = Date.now()
+  const confirmIds = list
+    .filter((item) => item.status === 2)
+    .filter((item) => {
+      const date = parseTime(item.createTime)
+      if (!date) return false
+      return now - date.getTime() >= AUTO_RECEIVE_MS
+    })
+    .map((item) => item.id)
+  const refundIds = list
+    .filter((item) => item.status === 1)
+    .filter((item) => {
+      const date = parseTime(item.createTime)
+      if (!date) return false
+      return now - date.getTime() >= GROUP_TIMEOUT_MS
+    })
+    .map((item) => item.id)
+
+  if (!confirmIds.length && !refundIds.length) return false
+  for (const id of confirmIds) {
+    try {
+      await updateStatus(id, 3)
+    } catch {
+      // ignore single failure
+    }
+  }
+  for (const id of refundIds) {
+    try {
+      await updateStatus(id, -1)
+    } catch {
+      // ignore single failure
+    }
+  }
+  return true
+}
+
+function syncOrderTabBadge(list: OrderInfo[]) {
+  const waiting = list.filter((item) => item.status === 1 || item.status === 2).length
+  if (waiting > 0) {
+    uni.setTabBarBadge({
+      index: 2,
+      text: waiting > 99 ? '99+' : String(waiting)
+    })
+  } else {
+    uni.removeTabBarBadge({ index: 2 })
+  }
+}
 
 const filteredOrders = computed(() => {
   if (activeStatus.value === 'all') return orderList.value
@@ -42,9 +123,11 @@ const displayOrders = computed(() => {
     ...item,
     no: item.no || `NO-${item.id}`,
     name: item.name || '社区生鲜商品',
+    cover: productCoverMap.value[Number(item.productId || 0)] || '',
     qty: item.qty ?? 1,
     price: item.price || '0.00',
-    statusUI: getStatusUI(item.status)
+    statusUI: getStatusUI(item.status),
+    pickupTip: estimatePickupTip(item.createTime, item.status)
   }))
 })
 
@@ -59,11 +142,12 @@ function getStatusUI(status: number) {
 function getStatusKind(status: number) {
   if (status === 3) return 'success'
   if (status === 2) return 'info'
-  if (status === 1) return 'warning'
+  if (status === 0 || status === 1) return 'warning'
   return 'info'
 }
 
 async function loadOrderList() {
+  userStore.hydrateUserId()
   if (!userStore.userId) {
     orderList.value = []
     errorMsg.value = '请先登录后查看订单'
@@ -76,7 +160,24 @@ async function loadOrderList() {
   errorMsg.value = ''
 
   try {
+    try {
+      const products = await getProductList()
+      const map: Record<number, string> = {}
+      products.forEach((item) => {
+        map[item.id] = item.images?.[0] || ''
+      })
+      productCoverMap.value = map
+    } catch {
+      productCoverMap.value = {}
+    }
+
     orderList.value = await getOrderList(userStore.userId)
+    const changed = await autoConfirmIfNeeded(orderList.value)
+    if (changed) {
+      orderList.value = await getOrderList(userStore.userId)
+    }
+    syncOrderTabBadge(orderList.value)
+    lastLoadedUserId.value = userStore.userId
     hasLoaded.value = true
   } catch (error) {
     errorMsg.value = '订单加载失败，请稍后重试'
@@ -86,9 +187,11 @@ async function loadOrderList() {
 }
 
 onShow(() => {
+  userStore.hydrateUserId()
   const shouldRefresh = uni.getStorageSync(ORDER_REFRESH_FLAG)
+  const userChanged = userStore.userId !== lastLoadedUserId.value
 
-  if (hasLoaded.value && !shouldRefresh) return
+  if (hasLoaded.value && !shouldRefresh && !userChanged) return
 
   if (shouldRefresh) {
     uni.removeStorageSync(ORDER_REFRESH_FLAG)
@@ -138,21 +241,35 @@ onPullDownRefresh(async () => {
       <view
         v-for="item in displayOrders"
         :key="item.id"
-        class="p-4 space-y-2 bg-white rounded-lg shadow-sm"
+        class="p-4 space-y-3 bg-white rounded-xl shadow-sm active:opacity-90"
         @click="goToOrderDetail(item.id)"
       >
         <view class="flex justify-between text-sm text-gray-600">
           <text>订单号：{{ item.no }}</text>
           <BaseTag :kind="getStatusKind(item.status)" :text="item.statusUI.label" />
         </view>
-        <text class="text-base font-bold text-fresh">{{ item.name }}</text>
-        <view class="flex justify-between text-sm text-gray-600">
-          <text>数量：{{ item.qty }}</text>
-          <text>￥{{ item.price }}</text>
+        <view class="flex gap-3">
+          <BaseSmartImage
+            :src="item.cover"
+            class-name="w-20 h-20 rounded-md bg-gray-100 flex-shrink-0"
+            fallback-bg="#eef2f7"
+            fallback-color="#667085"
+            :fallback-text="item.name"
+          />
+          <view class="flex-1 min-w-0">
+            <text class="text-base font-bold text-fresh line-clamp-2">{{ item.name }}</text>
+            <view class="mt-2 flex items-center justify-between text-sm text-gray-600">
+              <text>数量：{{ item.qty }}</text>
+              <text class="text-primary font-bold">￥{{ item.price }}</text>
+            </view>
+            <text class="block text-xs text-gray-400 mt-2">
+              下单时间: {{ item.createTime || '-' }}
+            </text>
+            <text class="block text-xs text-orange-500 mt-1">
+              {{ item.pickupTip }}
+            </text>
+          </view>
         </view>
-        <text class="block text-xs text-gray-400 pt-1">
-          下单时间: {{ item.createTime || '-' }}
-        </text>
       </view>
     </view>
 
@@ -170,3 +287,10 @@ onPullDownRefresh(async () => {
     </view>
   </view>
 </template>
+
+<style scoped>
+.wxss-page-fix {
+  display: block;
+}
+</style>
+

@@ -6,6 +6,11 @@ export interface SystemConfig {
   serviceTerms: string
   recommendMenus: RecommendMenuItem[]
   homeBanners: HomeBannerItem[]
+  tencentMapKey: string
+  aiAssistantEnabled: boolean
+  aiAssistantApiKey: string
+  aiAssistantLeaderPrompt: string
+  aiQuickPrompts: string[]
 }
 
 export interface RecommendMenuItem {

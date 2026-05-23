@@ -51,9 +51,18 @@
   /* 小程序特有相关 */
   "mp-weixin": {
     "appid": "wxab51c5b455c2d28e",
+    "lazyCodeLoading": "requiredComponents",
     "setting": {
       "urlCheck": false
     },
+    "permission": {
+      "scope.userLocation": {
+        "desc": "用于地图定位与导航服务"
+      }
+    },
+    "requiredPrivateInfos": [
+      "getLocation"
+    ],
     "usingComponents": true
   },
   "mp-alipay": {

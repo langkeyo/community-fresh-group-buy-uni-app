@@ -3,9 +3,13 @@ import { aiRecommendSchema } from '@/schemas/ai'
 import type { AiRecipeCard } from '@/types/ai'
 
 export async function getAiRecipeRecommend(
-  query: string
+  query: string,
+  options?: {
+    apiKey?: string
+    contextPrompt?: string
+  }
 ): Promise<AiRecipeCard> {
-  const res = await recommendAiApi(query)
+  const res = await recommendAiApi(query, options)
   const parsed = aiRecommendSchema.safeParse(res.data)
   if (!parsed.success) {
     const issue = parsed.error.issues[0]

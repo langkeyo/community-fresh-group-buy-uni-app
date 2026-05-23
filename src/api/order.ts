@@ -4,6 +4,11 @@ import http from '@/utils/request'
 export interface BackendOrderItem {
   id: string
   no: string
+  groupBuyId?: string
+  userId?: number
+  productId?: number
+  pickPointId?: number
+  leaderUserId?: number
   name: string
   qty: number
   price: string

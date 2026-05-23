@@ -18,6 +18,12 @@ export interface LoginResult {
   userInfo?: UserInfo
 }
 
+export interface UpdateProfileReq {
+  nickname?: string
+  avatar?: string
+  mobile?: string
+}
+
 // --- 接口定义 (修复重点) ---
 
 export const login = (code: string) => {
@@ -49,5 +55,11 @@ export const testApi = () => {
 export const getUserList = () => {
   return http.get<Result<UserInfo[]>>('/api/user/list') as unknown as Promise<
     Result<UserInfo[]>
+  >
+}
+
+export const updateUserProfile = (data: UpdateProfileReq) => {
+  return http.put<Result<UserInfo>>('/api/user/profile', data) as unknown as Promise<
+    Result<UserInfo>
   >
 }

@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { login, getUserInfo } from '@/api/user'
 import { useUserStore } from '@/stores/user'
+import { resolveAvatarUrl } from '@/utils/avatar'
 
 const userStore = useUserStore()
+
+const goServiceTerms = () => {
+  uni.navigateTo({ url: '/pages/terms/terms' })
+}
 
 // TODO: 后续大量用户改 userId:string
 const handleWechatLogin = async () => {
@@ -24,6 +29,7 @@ const handleWechatLogin = async () => {
 
       // 4. 顺手把用户信息也存了 (如果有的话)，没有就再调一次 info 接口
       if (res.data.userInfo) {
+        res.data.userInfo.avatar = resolveAvatarUrl(res.data.userInfo.avatar)
         const uid = Number(res.data.userInfo.id)
         if (!Number.isSafeInteger(uid)) {
           throw new Error('用户ID超出安全范围，请改为字符串ID方案')
@@ -34,6 +40,7 @@ const handleWechatLogin = async () => {
         // 如果登录接口没返回用户信息，稍微花点时间去拉取一下
         const infoRes = await getUserInfo()
         if (infoRes.data) {
+          infoRes.data.avatar = resolveAvatarUrl(infoRes.data.avatar)
           const uid = Number(infoRes.data.id)
           if (!Number.isSafeInteger(uid)) {
             throw new Error('用户ID超出安全范围，请改为字符串ID方案')
@@ -85,7 +92,8 @@ const handleWechatLogin = async () => {
 
     <!-- 协议声明 -->
     <view class="mt-6 text-xs text-gray-400">
-      登录即代表同意 <text class="text-[#F08800]">《用户服务协议》</text>
+      登录即代表同意
+      <text class="text-[#F08800]" @click="goServiceTerms">《用户服务协议》</text>
     </view>
   </view>
 </template>

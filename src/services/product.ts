@@ -2,8 +2,11 @@ import { getProductDetailApi, getProductListApi } from '@/api/product'
 import { productItemSchema, productListSchema } from '@/schemas/product'
 import type { ProductItem } from '@/types/product'
 
-const parseImages = (raw?: string) => {
+const parseImages = (raw?: string | string[]) => {
   if (!raw) return []
+  if (Array.isArray(raw)) {
+    return raw.map((x) => String(x || '').trim()).filter(Boolean)
+  }
   const text = String(raw).trim()
   if (!text) return []
   if (text.startsWith('[')) {
@@ -15,6 +18,11 @@ const parseImages = (raw?: string) => {
     }
   }
   return [text]
+}
+
+const parseVideoUrl = (raw?: string) => {
+  const text = String(raw || '').trim()
+  return text || undefined
 }
 
 export async function getProductList(
@@ -38,6 +46,7 @@ export async function getProductList(
     groupPrice3: item.groupPrice3,
     stock: item.stock,
     images: parseImages(item.images),
+    videoUrl: parseVideoUrl(item.videoUrl),
     status: item.status
   }))
 }
@@ -63,6 +72,7 @@ export async function getProductDetail(
     groupPrice3: parsed.data.groupPrice3,
     stock: parsed.data.stock,
     images: parseImages(parsed.data.images),
+    videoUrl: parseVideoUrl(parsed.data.videoUrl),
     status: parsed.data.status
   }
 }

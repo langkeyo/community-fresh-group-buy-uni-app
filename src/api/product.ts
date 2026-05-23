@@ -10,6 +10,7 @@ export interface ProductItemResp {
   groupPrice3?: number | string | null
   stock?: number | string
   images?: string
+  videoUrl?: string
   status?: number | string
 }
 

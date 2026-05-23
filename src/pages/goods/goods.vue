@@ -5,18 +5,21 @@ import BaseSmartImage from '@/components/base/BaseSmartImage.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { getProductList } from '@/services/product'
 import type { ProductItem } from '@/types/product'
-import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
+import { onPullDownRefresh, onShow, onPageScroll } from '@dcloudio/uni-app'
 
 const goodsList = ref<ProductItem[]>([])
 const PENDING_GOODS_CATEGORY_KEY = 'pending_goods_category'
 const BUY_KEYWORDS_KEY = 'goods_buy_keywords'
+const BUY_PRODUCT_IDS_KEY = 'goods_buy_product_ids'
 
 const sortList = ['默认', '价格', '库存']
 const activeCategory = ref('all')
 const activeSort = ref('默认')
 const keyword = ref('')
 const buyKeywords = ref<string[]>([])
+const buyProductIds = ref<number[]>([])
 const loading = ref(false)
+const showBackTop = ref(false)
 
 const CATEGORY_LABEL: Record<string, string> = {
   vegetable: '蔬菜',
@@ -58,6 +61,10 @@ const filteredGoods = computed(() => {
     list = list.filter((item) =>
       buyKeywords.value.some((k) => item.name.includes(k))
     )
+  }
+
+  if (buyProductIds.value.length) {
+    list = list.filter((item) => buyProductIds.value.includes(Number(item.id)))
   }
 
   if (activeSort.value === '价格') {
@@ -116,12 +123,26 @@ onShow(() => {
   const keywordList = Array.isArray(rawKeywords)
     ? rawKeywords.map((x) => String(x || '').trim()).filter(Boolean)
     : []
+  const rawIds = uni.getStorageSync(BUY_PRODUCT_IDS_KEY)
+  const idList = Array.isArray(rawIds)
+    ? rawIds.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)
+    : []
   if (keywordList.length) {
     buyKeywords.value = keywordList
-    keyword.value = ''
     uni.removeStorageSync(BUY_KEYWORDS_KEY)
+  }
+  if (idList.length) {
+    buyProductIds.value = idList
+    uni.removeStorageSync(BUY_PRODUCT_IDS_KEY)
+  }
+  if (!keywordList.length && !idList.length && !keyword.value.trim()) {
+    buyKeywords.value = []
+    buyProductIds.value = []
+  }
+  if (keywordList.length || idList.length) {
+    const label = keywordList.slice(0, 2).join('、') || `${idList.length}件商品`
     uni.showToast({
-      title: `已为您匹配食材：${keywordList.slice(0, 2).join('、')}`,
+      title: `已为您匹配食材：${label}`,
       icon: 'none'
     })
   }
@@ -130,6 +151,7 @@ onShow(() => {
 watch(keyword, (val) => {
   if (val.trim()) {
     buyKeywords.value = []
+    buyProductIds.value = []
   }
 })
 
@@ -137,6 +159,14 @@ onPullDownRefresh(async () => {
   await fetchGoods()
   uni.stopPullDownRefresh()
 })
+
+onPageScroll((e) => {
+  showBackTop.value = (e?.scrollTop || 0) > 520
+})
+
+function backToTop() {
+  uni.pageScrollTo({ scrollTop: 0, duration: 240 })
+}
 </script>
 
 <template>
@@ -248,6 +278,16 @@ onPullDownRefresh(async () => {
         <text class="text-xs text-gray-400">- 没有更多了 -</text>
       </view>
     </view>
+
+    <view
+      v-if="showBackTop"
+      class="back-top"
+      hover-class="opacity-80"
+      :hover-stay-time="80"
+      @click="backToTop"
+    >
+      顶部
+    </view>
   </view>
 </template>
 
@@ -270,5 +310,22 @@ onPullDownRefresh(async () => {
 
 .buy-btn:active {
   background: #e67700;
+}
+
+.back-top {
+  position: fixed;
+  right: 24rpx;
+  bottom: 120rpx;
+  width: 84rpx;
+  height: 84rpx;
+  border-radius: 9999rpx;
+  background: rgba(47, 82, 51, 0.92);
+  color: #ffffff;
+  font-size: 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 35;
+  box-shadow: 0 8rpx 20rpx rgba(15, 23, 42, 0.2);
 }
 </style>

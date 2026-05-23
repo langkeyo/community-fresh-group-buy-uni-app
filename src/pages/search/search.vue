@@ -68,6 +68,14 @@ function saveHistory(term: string) {
   uni.setStorageSync(HISTORY_KEY, next)
 }
 
+function removeHistory(term: string) {
+  const normalized = term.trim()
+  if (!normalized) return
+  const next = historyList.value.filter((x) => x !== normalized).slice(0, 8)
+  historyList.value = next
+  uni.setStorageSync(HISTORY_KEY, next)
+}
+
 function clearHistory() {
   historyList.value = []
   uni.removeStorageSync(HISTORY_KEY)
@@ -88,7 +96,11 @@ async function doSearch(term?: string) {
   let searchErrorMsg = ''
   try {
     nextGoodsList = await getProductList(query || undefined)
-    if (query) saveHistory(query)
+    if (query && nextGoodsList.length > 0) {
+      saveHistory(query)
+    } else if (query) {
+      removeHistory(query)
+    }
   } catch (error: any) {
     nextGoodsList = []
     searchErrorMsg = error?.message || '搜索失败，请重试'

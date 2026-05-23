@@ -17,7 +17,7 @@ import { backendOrderItemSchema, backendOrderListSchema, leaderWorkbenchSchema }
 import type { LeaderWorkbench, OrderInfo } from '@/types/order'
 
 function normalizeOrderStatus(status: number): OrderInfo['status'] {
-  if (status === 1 || status === 2 || status === 3 || status === -1)
+  if (status === 0 || status === 1 || status === 2 || status === 3 || status === -1)
     return status
   else return -1
 }
@@ -26,7 +26,11 @@ function mapBackendOrderToOrderInfo(item: BackendOrderItem): OrderInfo {
   return {
     id: item.id,
     no: item.no,
-    productId: (item as any).productId,
+    groupBuyId: (item as any).groupBuyId || '',
+    userId: item.userId,
+    productId: item.productId,
+    pickPointId: item.pickPointId,
+    leaderUserId: item.leaderUserId,
     name: item.name,
     qty: item.qty,
     price: item.price,

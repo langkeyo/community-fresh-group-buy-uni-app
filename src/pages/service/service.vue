@@ -21,7 +21,15 @@ onShow(() => {
 })
 
 const callService = () => {
-  uni.makePhoneCall({ phoneNumber: servicePhone.value })
+  uni.showModal({
+    title: '联系人工客服',
+    content: `是否拨打 ${servicePhone.value}？`,
+    success: (res) => {
+      if (res.confirm) {
+        uni.makePhoneCall({ phoneNumber: servicePhone.value })
+      }
+    }
+  })
 }
 
 const copyWechat = () => {
@@ -40,6 +48,10 @@ const copyWechat = () => {
         >客服微信：{{ serviceWechat }}</text
       >
       <view class="mt-4 flex gap-3">
+        <button
+          class="service-btn-chat"
+          open-type="contact"
+        >在线会话</button>
         <view class="px-5 py-3 text-sm rounded-full bg-primary text-white" @click="callService">电话客服</view>
         <view class="px-5 py-3 text-sm rounded-full border border-primary text-primary" @click="copyWechat">复制客服微信</view>
       </view>
@@ -56,3 +68,24 @@ const copyWechat = () => {
     </view>
   </view>
 </template>
+
+<style scoped>
+.wxss-page-fix {
+  display: block;
+}
+
+.service-btn-chat {
+  padding: 12rpx 28rpx;
+  line-height: 1.4;
+  border-radius: 9999rpx;
+  border: 1rpx solid #2f5233;
+  background: #fff;
+  color: #2f5233;
+  font-size: 26rpx;
+}
+
+.service-btn-chat::after {
+  border: none;
+}
+</style>
+

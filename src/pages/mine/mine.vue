@@ -3,14 +3,19 @@ import { ref } from 'vue'
 import BaseSmartImage from '@/components/base/BaseSmartImage.vue'
 import { getUserInfo } from '@/api/user' // 引入咱们封装好的接口
 import { getLeaderWorkbench } from '@/services/order'
+import { useUserStore } from '@/stores/user'
 import type { UserInfo } from '@/types/user' // 引入类型定义
 import { DEFAULT_AVATAR_PATH } from '@/constants/ui'
+import { resolveAvatarUrl } from '@/utils/avatar'
 import { onShow } from '@dcloudio/uni-app' // 生命周期钩子
 
 // --- 状态定义 ---
 const isLogin = ref(false)
 const userInfo = ref<UserInfo | null>(null)
 const leaderSummaryText = ref('进入工作台查看待核销订单')
+const userStore = useUserStore()
+const LEADER_APPLY_KEY = 'leader_apply_draft'
+const hasPendingLeaderApply = ref(false)
 
 // 默认的工具栏数据
 const tools = [
@@ -39,22 +44,33 @@ const checkLoginStatus = () => {
     const storedUser = uni.getStorageSync('userInfo')
     if (storedUser) {
       // storedUser 可能是 string 也可能是 object，安全解析一下
-      userInfo.value =
+      const parsedUser =
         typeof storedUser === 'string' ? JSON.parse(storedUser) : storedUser
+      if (parsedUser && typeof parsedUser === 'object') {
+        parsedUser.avatar = resolveAvatarUrl(parsedUser.avatar)
+      }
+      userInfo.value = parsedUser
     }
     // 悄悄在后台更新一下最新用户信息
     fetchUserInfo()
     loadLeaderSummary()
+    refreshLeaderApplyStatus()
   } else {
     isLogin.value = false
     userInfo.value = null
     leaderSummaryText.value = '登录后可查看团长工作台'
+    hasPendingLeaderApply.value = false
   }
+}
+
+const refreshLeaderApplyStatus = () => {
+  const raw = uni.getStorageSync(LEADER_APPLY_KEY)
+  hasPendingLeaderApply.value = Boolean(raw && typeof raw === 'object' && raw.submitAt)
 }
 
 const handleLogin = () => {
   if (isLogin.value) {
-    // 如果已经登录了，点头像可能想看个人详情，或者啥也不做
+    uni.navigateTo({ url: '/pages/account-security/account-security' })
     return
   }
 
@@ -68,7 +84,7 @@ const handleLogin = () => {
 const fetchUserInfo = async () => {
   try {
     const res = await getUserInfo()
-    if (res.code === 0 && res.data) {
+    if ((res.code === 0 || res.code === 200) && res.data) {
       updateLocalUser(res.data)
     }
   } catch (e) {
@@ -78,8 +94,10 @@ const fetchUserInfo = async () => {
 
 // 统一更新本地存储和响应式变量
 const updateLocalUser = (user: UserInfo) => {
+  user.avatar = resolveAvatarUrl(user.avatar)
   userInfo.value = user
   uni.setStorageSync('userInfo', user)
+  userStore.setUserId(Number(user.id))
   loadLeaderSummary()
 }
 
@@ -110,14 +128,72 @@ const goToLeader = () => {
 }
 
 const applyLeader = () => {
-  uni.showModal({
-    title: '团长权限开通',
-    content: '当前版本采用管理员审核开通，请联系客服提交申请信息。',
-    confirmText: '去联系客服',
+  if (hasPendingLeaderApply.value) {
+    uni.showToast({ title: '已提交申请，请等待管理员审核', icon: 'none' })
+    return
+  }
+  uni.navigateTo({ url: '/pages/leader/apply' })
+}
+
+const quickScan = () => {
+  if (!isLogin.value) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    return
+  }
+  uni.scanCode({
     success: (res) => {
-      if (res.confirm) {
-        uni.navigateTo({ url: '/pages/service/service' })
-      }
+      handleScanResult(String(res.result || '').trim())
+    }
+  })
+}
+
+const handleScanResult = (raw: string) => {
+  if (!raw) {
+    uni.showToast({ title: '扫码内容为空', icon: 'none' })
+    return
+  }
+
+  const productMatch = raw.match(/(?:product[:=])(\d+)/i)
+  if (productMatch?.[1]) {
+    uni.navigateTo({ url: `/pages/goods/detail?id=${Number(productMatch[1])}` })
+    return
+  }
+
+  const orderMatch = raw.match(/(?:order[:=])(\d+)/i)
+  if (orderMatch?.[1]) {
+    uni.navigateTo({ url: `/pages/order/detail?id=${Number(orderMatch[1])}` })
+    return
+  }
+
+  const groupMatch = raw.match(/(?:group[:=]|joinGroupId=)(\d+)/i)
+  if (groupMatch?.[1]) {
+    uni.navigateTo({ url: `/pages/group-buy/group-buy?joinGroupId=${Number(groupMatch[1])}` })
+    return
+  }
+
+  if (raw.includes('/pages/goods/detail')) {
+    uni.navigateTo({ url: raw.replace(/^https?:\/\/[^/]+/i, '') })
+    return
+  }
+  if (raw.includes('/pages/order/detail')) {
+    uni.navigateTo({ url: raw.replace(/^https?:\/\/[^/]+/i, '') })
+    return
+  }
+  if (raw.includes('/pages/group-buy/group-buy')) {
+    uni.navigateTo({ url: raw.replace(/^https?:\/\/[^/]+/i, '') })
+    return
+  }
+
+  uni.showModal({
+    title: '扫码结果',
+    content: raw.slice(0, 120),
+    confirmText: '复制',
+    success: (r) => {
+      if (!r.confirm) return
+      uni.setClipboardData({
+        data: raw,
+        success: () => uni.showToast({ title: '已复制', icon: 'success' })
+      })
     }
   })
 }
@@ -154,6 +230,9 @@ const handleToolClick = (route: string) => {
     <!-- 1. 头部背景 -->
     <view class="bg-[#F08800] px-6 pt-12 pb-16 rounded-b-[40rpx] relative">
       <!-- 顶部设置图标 -->
+      <view class="absolute top-12 right-24" @click="quickScan">
+        <uni-icons type="scan" size="24" color="#ffffff"></uni-icons>
+      </view>
       <view class="absolute top-12 right-6" @click="handleSetting">
         <uni-icons type="gear-filled" size="24" color="#ffffff"></uni-icons>
       </view>
@@ -199,32 +278,7 @@ const handleToolClick = (route: string) => {
       </view>
     </view>
 
-    <!-- 2. 资产卡片 -->
-    <view
-      class="mx-4 -mt-10 bg-white rounded-xl shadow-sm p-4 flex justify-around mb-4 relative z-10"
-    >
-      <view class="flex flex-col items-center">
-        <text class="text-lg font-bold text-[#2F5233]">暂未开通</text>
-        <text class="text-xs text-gray-500">余额</text>
-      </view>
-      <view class="w-[1px] bg-gray-100 h-8"></view>
-      <view class="flex flex-col items-center">
-        <text class="text-lg font-bold text-[#2F5233]">暂未开通</text>
-        <text class="text-xs text-gray-500">优惠券</text>
-      </view>
-      <view class="w-[1px] bg-gray-100 h-8"></view>
-      <view class="flex flex-col items-center">
-        <text class="text-lg font-bold text-[#2F5233]">暂未开通</text>
-        <text class="text-xs text-gray-500">积分</text>
-      </view>
-    </view>
-    <view class="mx-4 -mt-2 mb-4">
-      <text class="text-[22rpx] text-gray-400"
-        >资产能力状态：LIMITED（后端字段暂未开放）</text
-      >
-    </view>
-
-    <!-- 3. 团长入口 (根据 isLeader 状态动态显示) -->
+    <!-- 2. 团长入口 (根据 isLeader 状态动态显示) -->
     <view class="mx-4 mb-4">
       <!-- 已经是团长 -->
       <view
@@ -292,15 +346,18 @@ const handleToolClick = (route: string) => {
           ></uni-icons>
           <view>
             <text class="font-bold text-[#2F5233] text-lg block"
-              >申请团长权限</text
+              >{{ hasPendingLeaderApply ? '团长申请审核中' : '申请团长权限' }}</text
             >
-            <text class="text-xs text-gray-500">管理员审核后开通</text>
+            <text class="text-xs text-gray-500">{{
+              hasPendingLeaderApply ? '请耐心等待审核结果' : '管理员审核后开通'
+            }}</text>
           </view>
         </view>
         <view
           class="bg-[#2F5233] text-white px-3 py-1.5 rounded-full text-xs flex items-center"
+          :class="{ 'opacity-70': hasPendingLeaderApply }"
         >
-          去申请
+          {{ hasPendingLeaderApply ? '审核中' : '去申请' }}
           <uni-icons
             type="arrowright"
             size="12"
@@ -311,7 +368,7 @@ const handleToolClick = (route: string) => {
       </view>
     </view>
 
-    <!-- 4. 常用功能列表 -->
+    <!-- 3. 常用功能列表 -->
     <view class="panel-card mx-4 overflow-hidden">
       <view
         v-for="(item, index) in tools"

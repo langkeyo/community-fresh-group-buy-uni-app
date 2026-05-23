@@ -56,7 +56,13 @@ const fallbackConfig: SystemConfig = {
   serviceHours: '09:00-22:00',
   serviceTerms: '服务条款：当前版本为毕业设计演示环境，支付流程为模拟链路。',
   recommendMenus: defaultRecommendMenus,
-  homeBanners: []
+  homeBanners: [],
+  tencentMapKey: '',
+  aiAssistantEnabled: true,
+  aiAssistantApiKey: '',
+  aiAssistantLeaderPrompt:
+    '你是社区生鲜团购的AI客服，请优先推荐平台在售商品，回答简洁、可执行。',
+  aiQuickPrompts: ['怎么做减脂餐？', '冰箱里只有两个鸡蛋', '鸡胸肉怎么做不柴？']
 }
 
 function normalizeMenus(raw: RecommendMenuItem[]): RecommendMenuItem[] {
@@ -79,13 +85,27 @@ export async function getSystemConfig(): Promise<SystemConfig> {
     if (!parsed.success) {
       return fallbackConfig
     }
+    const quickPrompts = (parsed.data.extendedSettings?.aiAssistant?.quickPrompts || [])
+      .map((x) => String(x || '').trim())
+      .filter(Boolean)
+      .slice(0, 3)
     return {
       ...fallbackConfig,
       ...parsed.data,
       recommendMenus: normalizeMenus(parsed.data.recommendMenus || []),
       homeBanners: normalizeHomeBanners(
         parsed.data.extendedSettings?.homeBanners || []
-      )
+      ),
+      tencentMapKey:
+        parsed.data.extendedSettings?.apiWebhook?.tencentMapKey?.trim() || '',
+      aiAssistantEnabled:
+        parsed.data.extendedSettings?.aiAssistant?.enabled !== false,
+      aiAssistantApiKey:
+        parsed.data.extendedSettings?.aiAssistant?.apiKey?.trim() || '',
+      aiAssistantLeaderPrompt:
+        parsed.data.extendedSettings?.aiAssistant?.leaderPrompt?.trim() ||
+        fallbackConfig.aiAssistantLeaderPrompt,
+      aiQuickPrompts: quickPrompts.length ? quickPrompts : fallbackConfig.aiQuickPrompts
     }
   } catch (error) {
     return fallbackConfig

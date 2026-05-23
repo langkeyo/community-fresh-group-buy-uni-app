@@ -21,6 +21,15 @@
       }
     },
     {
+      "path": "pages/goods/detail",
+      "style": {
+        "navigationBarTitleText": "商品详情",
+        "navigationBarBackgroundColor": "#F08800",
+        "navigationBarTextStyle": "white",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/search/search",
       "style": {
         "navigationBarTitleText": "搜索商品",
@@ -52,15 +61,6 @@
         "navigationBarTextStyle": "white"
       }
     },
-    {
-      "path": "pages/goods/detail",
-      "style": {
-        "navigationBarTitleText": "商品详情",
-        "navigationBarBackgroundColor": "#F08800",
-        "navigationBarTextStyle": "white",
-        "enablePullDownRefresh": true
-      }
-    },
     // 拼团页
     {
       "path": "pages/group-buy/group-buy",
@@ -74,23 +74,6 @@
       "path": "pages/mine/mine",
       "style": {
         "navigationBarTitleText": "我的",
-        "navigationBarBackgroundColor": "#F08800",
-        "navigationBarTextStyle": "white"
-      }
-    },
-    {
-      "path": "pages/login/login",
-      "style": {
-        "navigationBarTitleText": "微信一键登录",
-        "navigationBarBackgroundColor": "#ffffff",
-        "navigationBarTextStyle": "black"
-      }
-    },
-    // AI食材助手页
-    {
-      "path": "pages/ai-food/ai-food",
-      "style": {
-        "navigationBarTitleText": "AI食材推荐",
         "navigationBarBackgroundColor": "#F08800",
         "navigationBarTextStyle": "white"
       }
@@ -133,7 +116,38 @@
         "navigationBarTextStyle": "white"
       }
     },
-    // 收货地址
+    {
+      "path": "pages/self-pick-map/self-pick-map",
+      "style": {
+        "navigationBarTitleText": "地图选自提点",
+        "navigationBarBackgroundColor": "#F08800",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/login/login",
+      "style": {
+        "navigationBarTitleText": "微信一键登录",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/ai-food/ai-food",
+      "style": {
+        "navigationBarTitleText": "AI食材推荐",
+        "navigationBarBackgroundColor": "#F08800",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/leader/apply",
+      "style": {
+        "navigationBarTitleText": "申请团长",
+        "navigationBarBackgroundColor": "#F08800",
+        "navigationBarTextStyle": "white"
+      }
+    },
     {
       "path": "pages/address/address",
       "style": {
@@ -142,7 +156,6 @@
         "navigationBarTextStyle": "white"
       }
     },
-    // 客服
     {
       "path": "pages/service/service",
       "style": {
@@ -151,7 +164,6 @@
         "navigationBarTextStyle": "white"
       }
     },
-    // 常见问题
     {
       "path": "pages/faq/faq",
       "style": {
@@ -160,7 +172,6 @@
         "navigationBarTextStyle": "white"
       }
     },
-    // 关于我们
     {
       "path": "pages/about/about",
       "style": {
@@ -168,8 +179,25 @@
         "navigationBarBackgroundColor": "#F08800",
         "navigationBarTextStyle": "white"
       }
+    },
+    {
+      "path": "pages/terms/terms",
+      "style": {
+        "navigationBarTitleText": "用户服务协议",
+        "navigationBarBackgroundColor": "#F08800",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/qr-tester/qr-tester",
+      "style": {
+        "navigationBarTitleText": "二维码生成测试",
+        "navigationBarBackgroundColor": "#F08800",
+        "navigationBarTextStyle": "white"
+      }
     }
   ],
+  "preloadRule": {},
   "globalStyle": {
     "navigationBarTextStyle": "white", // 全局导航栏文字默认白色
     "navigationBarTitleText": "邻里鲜拼", // 全局默认标题

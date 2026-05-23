@@ -1,15 +1,148 @@
 <script setup lang="ts">
 import { onLaunch, onShow, onHide } from '@dcloudio/uni-app'
+import { getNoticeList } from '@/services/notice'
+import { ref } from 'vue'
+
+const NOTICE_POPUP_MARK_KEY = 'notice_popup_last_key'
+const NOTICE_POLL_INTERVAL = 20000
+const NOTICE_REPEAT_AFTER_MS = 10 * 60 * 1000
+let noticeTimer: ReturnType<typeof setInterval> | null = null
+let checkingNotice = false
+let appVisible = false
+let dismissTimer: ReturnType<typeof setTimeout> | null = null
+const toastVisible = ref(false)
+const toastTitle = ref('')
+const toastBody = ref('')
+const startY = ref(0)
+
+function getCurrentUserId(): number {
+  const token = uni.getStorageSync('token')
+  if (!token) return 0
+  const storedUser = uni.getStorageSync('userInfo')
+  const user = storedUser
+    ? typeof storedUser === 'string'
+      ? JSON.parse(storedUser)
+      : storedUser
+    : null
+  const userId = Number(user?.id || 0)
+  return Number.isFinite(userId) && userId > 0 ? userId : 0
+}
+
+async function checkNoticeAndPopup() {
+  if (!appVisible || checkingNotice) return
+  const userId = getCurrentUserId()
+  if (!userId) return
+  checkingNotice = true
+  try {
+    const notices = await getNoticeList(userId)
+    const unread = notices.filter((x) => !x.read)
+    if (!unread.length) return
+
+    const top = unread[0]
+    const markKey = `${userId}_${top.id}`
+    const lastRaw = uni.getStorageSync(NOTICE_POPUP_MARK_KEY)
+    const now = Date.now()
+    let allow = true
+    if (lastRaw && typeof lastRaw === 'object') {
+      const lastKey = String((lastRaw as any).key || '')
+      const lastAt = Number((lastRaw as any).at || 0)
+      if (lastKey === markKey && now - lastAt < NOTICE_REPEAT_AFTER_MS) {
+        allow = false
+      }
+    } else {
+      const legacy = String(lastRaw || '')
+      if (legacy === markKey) {
+        allow = false
+      }
+    }
+    if (!allow) return
+    uni.setStorageSync(NOTICE_POPUP_MARK_KEY, { key: markKey, at: now })
+    showNoticeToast(top.title || '新通知', top.content || '您有一条新通知')
+  } catch (error) {
+    // 忽略通知异常，不阻断主流程
+  } finally {
+    checkingNotice = false
+  }
+}
+
+function showNoticeToast(title: string, content: string) {
+  toastTitle.value = title
+  toastBody.value = content
+  toastVisible.value = true
+  if (dismissTimer) clearTimeout(dismissTimer)
+  dismissTimer = setTimeout(() => {
+    closeNoticeToast()
+  }, 3000)
+}
+
+function closeNoticeToast() {
+  toastVisible.value = false
+  if (dismissTimer) {
+    clearTimeout(dismissTimer)
+    dismissTimer = null
+  }
+}
+
+function openNoticeCenter() {
+  closeNoticeToast()
+  uni.navigateTo({ url: '/pages/notice/notice' })
+}
+
+function onToastTouchStart(event: any) {
+  startY.value = Number(event?.changedTouches?.[0]?.clientY || 0)
+}
+
+function onToastTouchEnd(event: any) {
+  const endY = Number(event?.changedTouches?.[0]?.clientY || 0)
+  if (endY - startY.value < -20) {
+    closeNoticeToast()
+  }
+}
+
+function startNoticePolling() {
+  if (noticeTimer) return
+  noticeTimer = setInterval(() => {
+    checkNoticeAndPopup()
+  }, NOTICE_POLL_INTERVAL)
+}
+
+function stopNoticePolling() {
+  if (!noticeTimer) return
+  clearInterval(noticeTimer)
+  noticeTimer = null
+}
+
 onLaunch(() => {
   console.log('App Launch')
 })
-onShow(() => {
-  console.log('App Show')
+onShow(async () => {
+  appVisible = true
+  await checkNoticeAndPopup()
+  startNoticePolling()
 })
 onHide(() => {
+  appVisible = false
+  stopNoticePolling()
+  closeNoticeToast()
   console.log('App Hide')
 })
 </script>
+<template>
+  <view
+    v-if="toastVisible"
+    class="notice-toast"
+    @click="openNoticeCenter"
+    @touchstart="onToastTouchStart"
+    @touchend="onToastTouchEnd"
+  >
+    <view class="notice-dot"></view>
+    <view class="notice-content">
+      <text class="notice-title">{{ toastTitle }}</text>
+      <text class="notice-body">{{ toastBody }}</text>
+    </view>
+    <text class="notice-link">查看</text>
+  </view>
+</template>
 <style>
 @tailwind base;
 @tailwind components;
@@ -21,6 +154,15 @@ page {
   font-family: Inter, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC',
     'Source Han Sans SC', sans-serif;
   text-rendering: optimizeLegibility;
+}
+
+:root {
+  --safe-bottom: env(safe-area-inset-bottom);
+  --bottom-bar-gap-rpx: 16rpx;
+}
+
+.safe-bottom-padding {
+  padding-bottom: calc(var(--safe-bottom) + var(--bottom-bar-gap-rpx));
 }
 
 .base-input {
@@ -54,5 +196,58 @@ page {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.notice-toast {
+  position: fixed;
+  left: 20rpx;
+  right: 20rpx;
+  top: calc(18rpx + env(safe-area-inset-top));
+  z-index: 999999;
+  min-height: 96rpx;
+  border-radius: 16rpx;
+  background: rgba(17, 24, 39, 0.96);
+  box-shadow: 0 10rpx 30rpx rgba(0, 0, 0, 0.22);
+  padding: 14rpx 16rpx;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.notice-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  background: #ef4444;
+  flex-shrink: 0;
+}
+
+.notice-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notice-title {
+  display: block;
+  color: #fff;
+  font-size: 26rpx;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.notice-body {
+  display: block;
+  margin-top: 6rpx;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 22rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notice-link {
+  color: #fbbf24;
+  font-size: 24rpx;
+  margin-left: 8rpx;
 }
 </style>

@@ -3,7 +3,10 @@ import BaseButton from '@/components/base/BaseButton.vue'
 import BaseSmartImage from '@/components/base/BaseSmartImage.vue'
 import BaseTag from '@/components/base/BaseTag.vue'
 import { getAiRecipeRecommend } from '@/services/ai'
+import { getProductList } from '@/services/product'
+import { getSystemConfig } from '@/services/system-config'
 import type { AiRecipeHistoryItem, FavoriteItem } from '@/types/ai'
+import type { ProductItem } from '@/types/product'
 import { ref } from 'vue'
 
 interface ChatCard extends AiRecipeHistoryItem {
@@ -20,6 +23,7 @@ const pendingQuery = ref('')
 const thinkingStage = ref('正在理解你的需求...')
 const FAVORITE_KEY = 'ai_favorites'
 const BUY_KEYWORDS_KEY = 'goods_buy_keywords'
+const BUY_PRODUCT_IDS_KEY = 'goods_buy_product_ids'
 const favoriteMap = ref<Record<string, FavoriteItem>>({})
 const MIN_THINKING_MS = 900
 const THINKING_STAGE_LIST = [
@@ -27,6 +31,15 @@ const THINKING_STAGE_LIST = [
   '正在匹配可用食材...',
   '正在生成做法步骤...'
 ]
+const aiEnabled = ref(true)
+const aiApiKey = ref('')
+const leaderPrompt = ref('')
+const quickPrompts = ref<string[]>([
+  '怎么做减脂餐？',
+  '冰箱里只有两个鸡蛋',
+  '鸡胸肉怎么做不柴？'
+])
+const productDocSnippet = ref('')
 let thinkingStageTimer: ReturnType<typeof setInterval> | null = null
 
 const getFavoriteKey = (item: FavoriteItem) => `${item.title}||${item.desc}`
@@ -54,8 +67,7 @@ const saveFavorites = () => {
   uni.setStorageSync(FAVORITE_KEY, JSON.stringify(list))
 }
 
-const sleep = (ms: number) =>
-  new Promise((resolve) => setTimeout(resolve, ms))
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const startThinkingStageLoop = () => {
   stopThinkingStageLoop()
@@ -75,6 +87,10 @@ const stopThinkingStageLoop = () => {
 
 // 发送请求
 const handleSend = async () => {
+  if (!aiEnabled.value) {
+    uni.showToast({ title: 'AI客服暂未开启，请联系团长配置', icon: 'none' })
+    return
+  }
   if (!inputValue.value.trim() || isThinking.value) return
 
   const query = inputValue.value.trim()
@@ -111,7 +127,17 @@ const handleSend = async () => {
 
 // 生成回复逻辑
 const generateResponse = async (query: string) => {
-  const result = await getAiRecipeRecommend(query)
+  const contextPrompt = [
+    productDocSnippet.value,
+    leaderPrompt.value
+  ]
+    .map((x) => String(x || '').trim())
+    .filter(Boolean)
+    .join('\n\n')
+  const result = await getAiRecipeRecommend(query, {
+    apiKey: aiApiKey.value,
+    contextPrompt
+  })
   const favKey = getFavoriteKey(result)
   chatHistory.value.push({
     ...result,
@@ -190,7 +216,12 @@ const retryLast = async () => {
   await handleSend()
 }
 
-const handleBuyIngredients = (card: ChatCard) => {
+const normalizeText = (text: string) => String(text || '')
+  .toLowerCase()
+  .replace(/\s+/g, '')
+  .replace(/[()（）\-_/，,。！？!?:：]/g, '')
+
+const handleBuyIngredients = async (card: ChatCard) => {
   const names = card.ingredients
     .map((x) => (x.name || '').trim())
     .filter(Boolean)
@@ -199,15 +230,70 @@ const handleBuyIngredients = (card: ChatCard) => {
     uni.showToast({ title: '当前菜谱暂无可购买食材', icon: 'none' })
     return
   }
-  uni.setStorageSync(BUY_KEYWORDS_KEY, names)
+
+  let goods: ProductItem[] = []
+  try {
+    goods = await getProductList()
+  } catch (error) {
+    uni.showToast({ title: '商品数据加载失败，请稍后重试', icon: 'none' })
+    return
+  }
+
+  const matched = goods.filter((item) => {
+    const name = normalizeText(item.name || '')
+    if (!name) return false
+    return names.some((kw) => {
+      const key = normalizeText(kw)
+      return key && (name.includes(key) || key.includes(name))
+    })
+  })
+
+  if (!matched.length) {
+    uni.showToast({ title: '推荐食材暂无可售商品，请换一批试试', icon: 'none' })
+    return
+  }
+
+  const matchedKeywords = Array.from(new Set(matched.map((x) => (x.name || '').trim()).filter(Boolean)))
+  const matchedIds = Array.from(new Set(matched.map((x) => Number(x.id)).filter((x) => Number.isFinite(x) && x > 0)))
+  uni.setStorageSync(BUY_KEYWORDS_KEY, matchedKeywords.slice(0, 12))
+  uni.setStorageSync(BUY_PRODUCT_IDS_KEY, matchedIds.slice(0, 20))
   uni.switchTab({ url: '/pages/goods/goods' })
 }
 
+const buildProductDoc = (list: ProductItem[]) => {
+  const top = list
+    .slice(0, 20)
+    .map((item) => {
+      const price = (item.groupPrice2 ?? item.groupPrice3 ?? item.price).toFixed(2)
+      return `- ${item.name}｜分类:${item.category}｜团购价:${price}｜库存:${item.stock}`
+    })
+    .join('\n')
+  return `【平台在售商品文档】\n${top}`
+}
+
+const loadAiRuntimeConfig = async () => {
+  try {
+    const config = await getSystemConfig()
+    aiEnabled.value = config.aiAssistantEnabled !== false
+    aiApiKey.value = config.aiAssistantApiKey || ''
+    leaderPrompt.value = config.aiAssistantLeaderPrompt || ''
+    quickPrompts.value =
+      (config.aiQuickPrompts || []).filter(Boolean).slice(0, 3).length >= 3
+        ? (config.aiQuickPrompts || []).filter(Boolean).slice(0, 3)
+        : quickPrompts.value
+    const products = await getProductList()
+    productDocSnippet.value = buildProductDoc(products)
+  } catch {
+    aiEnabled.value = true
+  }
+}
+
 loadFavorites()
+void loadAiRuntimeConfig()
 </script>
 
 <template>
-  <view class="flex flex-col min-h-screen bg-[#F8F8F8] pb-[140rpx]">
+  <view class="flex flex-col min-h-screen bg-[#F8F8F8]" style="padding-bottom: calc(220rpx + var(--safe-bottom))">
     <!-- 1. 顶部欢迎语 (无历史记录时显示) -->
     <view
       v-if="chatHistory.length === 0 && !pendingQuery"
@@ -225,26 +311,32 @@ loadFavorites()
         输入您冰箱里的食材（如“番茄
         鸡蛋”），或者告诉我想吃的类型（如“低脂晚餐”），我为您生成专属食谱。
       </text>
+      <view
+        v-if="!aiEnabled"
+        class="w-full bg-white rounded-xl p-4 border border-red-100 mb-6"
+      >
+        <text class="text-sm text-red-500">AI客服暂未开启，请联系团长在后台完成配置。</text>
+      </view>
 
       <!-- 快捷标签 -->
       <view class="flex flex-wrap gap-2 justify-center">
         <view
           class="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-[#2F5233] active:bg-gray-50"
-          @click="handleTagClick('怎么做减脂餐？')"
+          @click="handleTagClick(quickPrompts[0] || '怎么做减脂餐？')"
         >
-          🥗 怎么做减脂餐？
+          🥗 {{ quickPrompts[0] || '怎么做减脂餐？' }}
         </view>
         <view
           class="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-[#2F5233] active:bg-gray-50"
-          @click="handleTagClick('冰箱里只有两个鸡蛋')"
+          @click="handleTagClick(quickPrompts[1] || '冰箱里只有两个鸡蛋')"
         >
-          🥚 冰箱里只有两个鸡蛋
+          🥚 {{ quickPrompts[1] || '冰箱里只有两个鸡蛋' }}
         </view>
         <view
           class="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-[#2F5233] active:bg-gray-50"
-          @click="handleTagClick('鸡胸肉怎么做不柴？')"
+          @click="handleTagClick(quickPrompts[2] || '鸡胸肉怎么做不柴？')"
         >
-          🍗 鸡胸肉怎么做不柴？
+          🍗 {{ quickPrompts[2] || '鸡胸肉怎么做不柴？' }}
         </view>
       </view>
 
@@ -378,7 +470,10 @@ loadFavorites()
         </view>
       </view>
 
-      <view v-if="errorTip" class="bg-white rounded-xl p-4 border border-red-100">
+      <view
+        v-if="errorTip"
+        class="bg-white rounded-xl p-4 border border-red-100"
+      >
         <text class="text-sm text-red-500">{{ errorTip }}</text>
         <view class="mt-3">
           <BaseButton text="重试" @click="retryLast" />
@@ -424,7 +519,7 @@ loadFavorites()
 
     <!-- 3. 底部输入栏 -->
     <view
-      class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-3 pb-safe z-50"
+      class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-3 safe-bottom-padding z-50"
     >
       <view class="bg-[#F8F8F8] rounded-full p-1">
         <view class="flex items-center px-3 py-1">
@@ -442,7 +537,7 @@ loadFavorites()
             :class="
               isThinking
                 ? 'bg-[#F6B04A]'
-                : inputValue.trim()
+                : inputValue.trim() && aiEnabled
                   ? 'bg-[#F08800]'
                   : 'bg-gray-300'
             "
@@ -483,11 +578,6 @@ loadFavorites()
   to {
     opacity: 1;
   }
-}
-
-/* 底部安全区适配 */
-.pb-safe {
-  padding-bottom: calc(12px + env(safe-area-inset-bottom));
 }
 
 .ai-thinking__spinner,

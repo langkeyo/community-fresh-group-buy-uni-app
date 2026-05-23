@@ -3,9 +3,11 @@ import { getUserList } from '@/api/user'
 import BaseSmartImage from '@/components/base/BaseSmartImage.vue'
 import { DEFAULT_AVATAR_PATH } from '@/constants/ui'
 import { getNoticeList } from '@/services/notice'
+import { getOrderList } from '@/services/order'
 import { getProductList } from '@/services/product'
 import { getSystemConfig } from '@/services/system-config'
 import type { RecommendMenuItem } from '@/types/system-config'
+import { resolveAvatarUrl } from '@/utils/avatar'
 import { onShow } from '@dcloudio/uni-app'
 import { ref } from 'vue'
 
@@ -51,7 +53,30 @@ const noticeText = ref('')
 const aiDotVisible = ref(false)
 const groupFeedDotVisible = ref(false)
 const noticeUnreadCount = ref(0)
-const groupFeedList = ref<string[]>([])
+const groupFeedList = ref<{ text: string; productId: number }[]>([])
+const currentUserInfo = ref<any | null>(null)
+const locationLabel = ref('点击定位并选择自提点')
+const homeOrderTip = ref('上午下单预计当日18:00后可提货，下午下单预计次日10:00后可提货')
+const pendingGroupCount = ref(0)
+const pendingPickupCount = ref(0)
+const aiEntryVisible = ref(false)
+
+function parseTime(ts?: string) {
+  if (!ts) return null
+  const date = new Date(String(ts).replace(' ', 'T'))
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function syncOrderTabBadge(count: number) {
+  if (count > 0) {
+    uni.setTabBarBadge({
+      index: 2,
+      text: count > 99 ? '99+' : String(count)
+    })
+  } else {
+    uni.removeTabBarBadge({ index: 2 })
+  }
+}
 
 function maskMobile(mobile?: string) {
   const text = String(mobile || '').trim()
@@ -65,6 +90,7 @@ async function loadHomeData() {
     const config = await getSystemConfig()
     noticeText.value = config.noticeText || ''
     categoryList.value = config.recommendMenus || []
+    aiEntryVisible.value = Boolean(config.aiAssistantEnabled)
 
     const products = await getProductList()
     const productMap = new Map(products.map((item) => [item.id, item]))
@@ -104,7 +130,10 @@ async function loadHomeData() {
     })
     groupFeedList.value = products.slice(0, 6).map((item, idx) => {
       const size = item.groupPrice3 != null ? 3 : 2
-      return `第${idx + 1}组正在拼「${item.name}」${size}人团`
+      return {
+        text: `第${idx + 1}组正在拼「${item.name}」${size}人团`,
+        productId: item.id
+      }
     })
 
     const usersRes = await getUserList()
@@ -112,7 +141,7 @@ async function loadHomeData() {
     leaderList.value = leaders.slice(0, 1).map((item) => ({
       id: item.id,
       name: item.nickname || `团长#${item.id}`,
-      avatar: item.avatar || DEFAULT_AVATAR_PATH,
+      avatar: resolveAvatarUrl(item.avatar, DEFAULT_AVATAR_PATH),
       community: `联系方式：${maskMobile(item.mobile)}`,
       membersLabel: `团长ID #${item.id}`
     }))
@@ -123,13 +152,48 @@ async function loadHomeData() {
         ? JSON.parse(stored)
         : stored
       : null
+    currentUserInfo.value = userInfo
     const userId = Number(userInfo?.id || 0)
     if (userId > 0) {
       const notices = await getNoticeList(userId)
       noticeUnreadCount.value = notices.filter((item) => !item.read).length
+      try {
+        const orders = await getOrderList(userId)
+        pendingGroupCount.value = orders.filter((x) => x.status === 1).length
+        pendingPickupCount.value = orders.filter((x) => x.status === 2).length
+        syncOrderTabBadge(pendingGroupCount.value + pendingPickupCount.value)
+        const latest = orders
+          .filter((x) => x.status === 1 || x.status === 2)
+          .sort((a, b) => {
+            const ta = parseTime(a.createTime)?.getTime() || 0
+            const tb = parseTime(b.createTime)?.getTime() || 0
+            return tb - ta
+          })[0]
+        if (latest) {
+          if (latest.status === 1) {
+            homeOrderTip.value = '待成团订单将在成团后约2小时内可提货，请留意订单通知'
+          } else {
+            const hour = parseTime(latest.createTime)?.getHours() ?? 9
+            homeOrderTip.value =
+              hour < 12
+                ? '该订单预计今日18:00后可提货，请关注订单详情提醒'
+                : '该订单预计次日10:00后可提货，请关注订单详情提醒'
+          }
+        }
+      } catch {
+        pendingGroupCount.value = 0
+        pendingPickupCount.value = 0
+        syncOrderTabBadge(0)
+      }
     } else {
       noticeUnreadCount.value = 0
+      pendingGroupCount.value = 0
+      pendingPickupCount.value = 0
+      syncOrderTabBadge(0)
     }
+
+    const pickName = String(uni.getStorageSync('default_pick_point_name') || '').trim()
+    locationLabel.value = pickName || '点击定位并选择自提点'
   } catch (error: any) {
     uni.showToast({
       title: error?.message || '首页数据加载失败',
@@ -138,6 +202,11 @@ async function loadHomeData() {
     hotProductList.value = []
     leaderList.value = []
     noticeUnreadCount.value = 0
+    pendingGroupCount.value = 0
+    pendingPickupCount.value = 0
+    syncOrderTabBadge(0)
+    locationLabel.value = '点击定位并选择自提点'
+    aiEntryVisible.value = false
   } finally {
     hotLoading.value = false
   }
@@ -162,11 +231,35 @@ function goToSearchPage() {
   uni.navigateTo({ url: '/pages/search/search' })
 }
 
+function goToPickPointPage() {
+  uni.navigateTo({ url: '/pages/self-pick-map/self-pick-map' })
+}
+
 function goToNoticePage() {
+  if (!ensureLogin('查看通知')) return
   uni.navigateTo({ url: '/pages/notice/notice' })
 }
 
+function ensureLogin(actionText = '继续操作'): boolean {
+  const token = uni.getStorageSync('token')
+  if (token) return true
+  uni.showModal({
+    title: '请先登录',
+    content: `${actionText}需要先登录，是否前往登录页？`,
+    success: (res) => {
+      if (res.confirm) {
+        uni.navigateTo({ url: '/pages/login/login' })
+      }
+    }
+  })
+  return false
+}
+
 function goToAiFoodPage() {
+  if (!aiEntryVisible.value) {
+    uni.showToast({ title: 'AI功能暂未开启', icon: 'none' })
+    return
+  }
   aiDotVisible.value = false
   uni.setStorageSync(HOME_AI_DOT_READ_KEY, true)
   uni.navigateTo({ url: '/pages/ai-food/ai-food' })
@@ -178,8 +271,13 @@ function markGroupFeedRead() {
   uni.setStorageSync(HOME_GROUP_FEED_DOT_READ_KEY, true)
 }
 
-function goToBanner(item: { productId: number }) {
+function goToGroupFeedItem(item: { productId: number }) {
+  markGroupFeedRead()
   goToHotGroupBuy(item.productId)
+}
+
+function goToBanner(item: { productId: number }) {
+  goToProductDetail(item.productId)
 }
 
 function goToHotGroupBuy(productId: number) {
@@ -199,10 +297,23 @@ function goToHotGroupBuy(productId: number) {
     url: `/pages/group-buy/group-buy?id=${productId}&pickPointId=${storedPickId}`
   })
 }
+
+function goToProductDetail(productId: number) {
+  uni.navigateTo({ url: `/pages/goods/detail?id=${productId}` })
+}
+
+function goToLeaderEntry() {
+  if (!ensureLogin('进入团长入口')) return
+  if (currentUserInfo.value?.isLeader) {
+    uni.navigateTo({ url: '/pages/leader/leader' })
+    return
+  }
+  uni.navigateTo({ url: '/pages/mine/mine' })
+}
 </script>
 
 <template>
-  <view class="min-h-screen bg-gray-50 px-4 pt-4 space-y-5">
+  <view class="min-h-screen bg-gray-50 px-4 pt-4 space-y-5 safe-bottom-padding">
     <view
       v-if="noticeText"
       class="section-card notice-card"
@@ -222,12 +333,29 @@ function goToHotGroupBuy(productId: number) {
       </view>
     </view>
 
+    <view class="section-card order-tip-card">
+      <view class="flex items-center justify-between">
+        <text class="text-sm font-bold text-fresh">订单提醒</text>
+        <text class="text-[22rpx] text-orange-600">待成团{{ pendingGroupCount }} · 待取货{{ pendingPickupCount }}</text>
+      </view>
+      <text class="block text-[22rpx] text-gray-500 mt-2">{{ homeOrderTip }}</text>
+    </view>
+
     <!-- 搜索框 -->
-    <view
-      class="search-entry"
-      @click="goToSearchPage"
-    >
-      <text class="text-gray-400 text-base">搜索今日特价生鲜...</text>
+    <view class="flex items-center gap-2">
+      <view
+        class="location-entry"
+        @click="goToPickPointPage"
+      >
+        <uni-icons type="location-filled" size="16" color="#F08800" />
+        <text class="text-[22rpx] text-[#2F5233] line-clamp-1 ml-1">{{ locationLabel }}</text>
+      </view>
+      <view
+        class="search-entry flex-1"
+        @click="goToSearchPage"
+      >
+        <text class="text-gray-400 text-base">搜索今日特价生鲜...</text>
+      </view>
     </view>
 
     <!-- 轮播图 -->
@@ -291,6 +419,7 @@ function goToHotGroupBuy(productId: number) {
 
     <!-- AI 模块 -->
     <view
+      v-if="aiEntryVisible"
       class="section-card bg-gradient-to-r from-secondary to-white flex items-center justify-between"
       @click="goToAiFoodPage"
     >
@@ -306,7 +435,7 @@ function goToHotGroupBuy(productId: number) {
       </view>
     </view>
 
-    <view class="section-card px-4 py-3" @click="markGroupFeedRead">
+    <view class="section-card px-4 py-3">
       <view class="flex items-center">
         <view class="flex items-center mr-3">
           <text class="text-xs text-primary font-bold leading-normal">实时拼单</text>
@@ -323,12 +452,12 @@ function goToHotGroupBuy(productId: number) {
           :interval="2400"
           :duration="500"
         >
-          <swiper-item v-for="(item, idx) in groupFeedList" :key="idx" class="feed-swiper-item">
-            <text class="text-xs text-gray-600 line-clamp-1 feed-item-text">{{ item }}</text>
-          </swiper-item>
-        </swiper>
+            <swiper-item v-for="(item, idx) in groupFeedList" :key="idx" class="feed-swiper-item" @click="goToGroupFeedItem(item)">
+              <text class="text-xs text-gray-600 line-clamp-1 feed-item-text">{{ item.text }}</text>
+            </swiper-item>
+          </swiper>
+        </view>
       </view>
-    </view>
 
     <!-- 热门拼团 -->
     <view class="space-y-2">
@@ -339,7 +468,7 @@ function goToHotGroupBuy(productId: number) {
           v-for="item in hotProductList"
           :key="item.id"
           class="section-card p-4 tap-card"
-          @click="goToHotGroupBuy(item.id)"
+          @click="goToProductDetail(item.id)"
         >
           <!-- <view class="w-full h-20 bg-secondary rounded-md mb-2"></view> -->
           <BaseSmartImage
@@ -384,9 +513,17 @@ function goToHotGroupBuy(productId: number) {
 
     <!-- 团长模块 -->
     <view class="section-card p-4 space-y-2" v-if="leaderList.length">
-      <text class="text-base font-bold text-fresh">今日明星团长</text>
+      <view class="flex items-center justify-between">
+        <text class="text-base font-bold text-fresh">今日明星团长</text>
+        <text class="text-xs text-primary" @click="goToLeaderEntry">
+          {{ currentUserInfo?.isLeader ? '进入团长工作台' : '查看团长入口' }}
+        </text>
+      </view>
 
-      <view class="bg-secondary rounded-lg p-4 flex items-center gap-4">
+      <view
+        class="bg-secondary rounded-lg p-4 flex items-center gap-4 active:opacity-90"
+        @click="goToLeaderEntry"
+      >
         <BaseSmartImage
           :src="leaderList[0].avatar"
           class-name="w-14 h-14 rounded-full border border-white/80 overflow-hidden bg-white"
@@ -402,9 +539,33 @@ function goToHotGroupBuy(productId: number) {
             leaderList[0].community
           }}</text>
         </view>
-        <text class="text-xs text-gray-600"
-          >{{ leaderList[0].membersLabel }}</text
-        >
+        <view class="text-right">
+          <text class="block text-xs text-gray-600"
+            >{{ leaderList[0].membersLabel }}</text
+          >
+          <text class="block text-[20rpx] text-primary mt-1">可点击查看</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="section-card p-4 space-y-2" v-else>
+      <view class="flex items-center justify-between">
+        <text class="text-base font-bold text-fresh">团长入口</text>
+        <text class="text-xs text-gray-500">订单核销与管理都在团长工作台</text>
+      </view>
+      <view
+        class="bg-[#F6FBF7] border border-[#D8EAD9] rounded-lg p-4 flex items-center justify-between active:opacity-90"
+        @click="goToLeaderEntry"
+      >
+        <view>
+          <text class="block text-sm font-bold text-[#2F5233]">
+            {{ currentUserInfo?.isLeader ? '进入团长工作台' : '申请成为团长' }}
+          </text>
+          <text class="block text-xs text-gray-500 mt-1">
+            {{ currentUserInfo?.isLeader ? '核销、查看待办、回看最近核销' : '当前账号未开通团长权限，可前往“我的”页提交申请' }}
+          </text>
+        </view>
+        <text class="text-xs text-primary">{{ currentUserInfo?.isLeader ? '去查看' : '去申请' }}</text>
       </view>
     </view>
 
@@ -441,6 +602,11 @@ function goToHotGroupBuy(productId: number) {
   align-items: center;
 }
 
+.order-tip-card {
+  border: 1rpx solid #fed7aa;
+  background: #fffbeb;
+}
+
 .search-entry {
   display: flex;
   align-items: center;
@@ -450,6 +616,17 @@ function goToHotGroupBuy(productId: number) {
   padding: 0 20rpx;
   border: 1rpx solid #e5e7eb;
   box-shadow: 0 4rpx 12rpx rgba(15, 23, 42, 0.04);
+}
+
+.location-entry {
+  display: flex;
+  align-items: center;
+  background: #fff7ed;
+  border-radius: 9999rpx;
+  height: 56rpx;
+  padding: 0 18rpx;
+  border: 1rpx solid #f9c692;
+  max-width: 320rpx;
 }
 
 .tap-card:active {

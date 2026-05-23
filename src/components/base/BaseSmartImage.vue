@@ -16,7 +16,7 @@ const props = withDefaults(
     fallbackText: '图片加载失败',
     fallbackBg: '#f2f4f7',
     fallbackColor: '#6b7280',
-    className: ''
+    className: 'w-48 h-48!'
   }
 )
 
@@ -45,7 +45,7 @@ const onError = () => {
 </script>
 
 <template>
-  <view :class="className" class="smart-image-wrapper">
+  <view :class="`smart-image-wrapper ${className}`">
     <image
       v-if="showImage"
       :src="src"

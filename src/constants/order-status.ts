@@ -1,9 +1,14 @@
-export type OrderStatus = 1 | 2 | 3 | -1
+export type OrderStatus = 0 | 1 | 2 | 3 | -1
 
 export const ORDER_STATUS_MAP: Record<
   number,
   { textClass: string; bgClass: string; label: string }
 > = {
+  0: {
+    textClass: 'text-amber-700',
+    bgClass: 'bg-amber-50',
+    label: '待支付(演示)'
+  },
   1: {
     textClass: 'text-orange-600',
     bgClass: 'bg-orange-50',
@@ -12,7 +17,7 @@ export const ORDER_STATUS_MAP: Record<
   2: {
     textClass: 'text-blue-600',
     bgClass: 'bg-blue-50',
-    label: '已成团'
+    label: '待收货'
   },
   3: {
     textClass: 'text-green-600',

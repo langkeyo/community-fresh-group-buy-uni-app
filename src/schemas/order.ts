@@ -3,7 +3,10 @@ import { z } from 'zod'
 export const backendOrderItemSchema = z.object({
   id: z.string(),
   no: z.string(),
+  userId: z.coerce.number().optional(),
   productId: z.coerce.number().optional(),
+  pickPointId: z.coerce.number().optional(),
+  leaderUserId: z.coerce.number().optional(),
   name: z.string(),
   qty: z.number(),
   price: z.string(),
@@ -13,7 +16,7 @@ export const backendOrderItemSchema = z.object({
   remark: z.string().optional(),
   pickPointName: z.string(),
   pickPointAddress: z.string(),
-  status: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(-1)]),
+  status: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(-1)]),
   createTime: z.string()
 })
 

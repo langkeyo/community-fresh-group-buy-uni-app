@@ -4,9 +4,11 @@ import type { HttpResponse } from 'luch-request' // 引入类型
 import type { Result } from '@/types/response'
 
 const http = new Request()
+const API_BASE_URL =
+  (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8080'
 
 http.setConfig((config) => {
-  config.baseURL = 'http://localhost:8080'
+  config.baseURL = API_BASE_URL
   config.timeout = 10000
   config.header = {
     ...config.header,
